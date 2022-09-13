@@ -70,19 +70,21 @@ theme_leo <- function(base_size = 11,
 ggtext_size <- 10 / (14 / 5)
 ```
 
+# Path until now
+
 ## Load data
 
 ```{r}
 world <- ne_countries(scale = "medium", returnclass = "sf", continent = "europe")
 
 POIs <- tribble(
-  ~lat, ~lon, ~name, ~relevance, ~step,
-  54.083333, 13.383333, "Greifswald", "black", 3,
-  59.329444, 18.068611, "Stockholm", "black", 5,
-  59.858056, 17.644722, "Uppsala", "black", 4,
-  52.52, 13.405, "Berlin", "grey50", 2,
-  52.770490, 11.877250, "Rohrbeck", "grey50", 1,
-  55.676111, 12.568333, "Copenhagen", "black", 6
+  ~lat, ~lon, ~name, ~relevance,
+  54.083333, 13.383333, "Greifswald", "black",
+  59.329444, 18.068611, "Stockholm", "black",
+  59.858056, 17.644722, "Uppsala", "black",
+  52.52, 13.405, "Berlin", "grey50",
+  52.770490, 11.877250, "Rohrbeck", "grey50",
+  55.676111, 12.568333, "Copenhagen", "black"
 )
 ```
 
@@ -217,4 +219,85 @@ animate(
   )
 
 anim_save("europe.gif")
+```
+
+# CPH--Freiburg
+
+## Load data
+
+```{r}
+world <- ne_countries(scale = "medium", returnclass = "sf", continent = "europe")
+
+POIs <- tribble(
+  ~lat, ~lon, ~name, ~relevance,
+  55.676111, 12.568333, "Copenhagen", "black",
+  47.995, 7.85, "Freiburg", "black"
+)
+```
+
+## Plot map
+
+```{r}
+map <- ggplot() +
+  geom_sf(
+    data = world,
+    colour = "white",
+    fill = "darkseagreen",
+    size = 0.5
+  ) +
+  coord_sf(xlim = c(-11, 31), ylim = c(44, 71), expand = FALSE) +
+  geom_point(
+    data = POIs,
+    aes(
+      x = lon,
+      y = lat,
+      colour = relevance
+    ),
+    size = 2,
+    inherit.aes = FALSE
+  ) +
+  annotate("curve", # CPH <-> Freiburg
+    colour = "#e8c245",
+    size = 1,
+    linetype = 1,
+    lineend = "butt",
+    curvature = 0.2,
+    x = 12.1,
+    y = 55.2, 
+    xend = 7.85,
+    yend = 48.5, 
+    arrow = arrow(
+      type = "closed",
+      length = unit(2, "mm"),
+      ends = "both"
+    )
+  ) +
+  geom_label_repel(
+    data = POIs,
+    aes(
+      x = lon,
+      y = lat,
+      label = name,
+      colour = relevance
+    ),
+    seed = 948,
+    nudge_x = 3,
+    family = "IBMPlexSans",
+    size = ggtext_size,
+    min.segment.length = 2,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5)
+  ) +
+  scale_colour_manual(values = c("black", "grey50")) +
+  theme_leo() +
+  theme(
+    panel.background = element_rect(fill = "lightblue", colour = NA),
+    legend.position = "none",
+    plot.background = element_rect(fill = "#fff9f5ff", colour = NA)
+  )
+
+pdf("CPH-Freiburg.pdf", width = 5, height = 5.7)
+map
+dev.off()
 ```
