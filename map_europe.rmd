@@ -221,6 +221,70 @@ animate(
 anim_save("europe.gif")
 ```
 
+# Stockholm
+
+## Load data
+
+```{r}
+world <- ne_countries(scale = "medium", returnclass = "sf", continent = "europe")
+
+POIs <- tribble(
+  ~lat, ~lon, ~name, ~relevance,
+  59.329444, 18.068611, "Stockholm", "black",
+)
+```
+
+## Plot map
+
+```{r}
+map <- ggplot() +
+  geom_sf(
+    data = world,
+    colour = "white",
+    fill = "darkseagreen",
+    size = 0.25
+  ) +
+  coord_sf(xlim = c(-11, 31), ylim = c(44, 71), expand = FALSE) +
+  geom_point(
+    data = POIs,
+    aes(
+      x = lon,
+      y = lat,
+      colour = relevance
+    ),
+    size = 2,
+    inherit.aes = FALSE
+  ) +
+  geom_label_repel(
+    data = POIs,
+    aes(
+      x = lon,
+      y = lat,
+      label = name,
+      colour = relevance
+    ),
+    seed = 948,
+    nudge_x = 3,
+    family = "IBMPlexSans",
+    size = ggtext_size,
+    min.segment.length = 2,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5)
+  ) +
+  scale_colour_manual(values = c("black", "grey50")) +
+  theme_leo() +
+  theme(
+    panel.background = element_rect(fill = "lightblue", colour = NA),
+    legend.position = "none",
+    plot.background = element_rect(fill = "#fff9f5ff", colour = NA)
+  )
+
+pdf("Stockholm.pdf", width = 5, height = 5.7)
+map
+dev.off()
+```
+
 # CPH--Freiburg
 
 ## Load data
@@ -243,7 +307,7 @@ map <- ggplot() +
     data = world,
     colour = "white",
     fill = "darkseagreen",
-    size = 0.5
+    size = 0.25
   ) +
   coord_sf(xlim = c(-11, 31), ylim = c(44, 71), expand = FALSE) +
   geom_point(
