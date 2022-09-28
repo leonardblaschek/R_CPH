@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggtext)
 library(ggrepel)
+library(ggridges)
 library(showtext)
 
 ## import Helvetica ####
@@ -88,7 +89,7 @@ onecol <- 9 / 2.54
 
 # CSC velocity to cellulose content regression
 
-## Load data
+## Load relative data
 
 ```{r}
 velo_data <- read_tsv('/home/leonard/Dropbox/2022_molplant_review/velocity_cellulose.tsv') %>% 
@@ -147,5 +148,60 @@ pdf("velocity_cellulose.pdf", height = onecol, width = onecol)
 velo_plot
 dev.off()
 ```
+# Distribution of WT velocities
+
+## Load absolute data
+
+```{r}
+velo_data_WT <- read_tsv('/home/leonard/Dropbox/2022_molplant_review/velocity_cellulose.tsv') %>% 
+  filter(perturbation == 'WT') %>% 
+  mutate(colour = case_when(str_detect(`mutated gene`, 'CESA') ~ 'CESA',
+                               perturbation == 'WT' ~ 'WT',
+                               TRUE ~ 'accessory protein'),
+         gene_type = case_when(str_detect(`mutated gene`, 'CESA') ~ 'CESA',
+                               TRUE ~ 'accessory protein'),
+         face = case_when(`perturbation type` == 'mutation' ~ 'italic',
+                          TRUE ~ 'plain'),
+         CESA = case_when(gene_type =='CESA' ~ `mutated gene`,
+                          TRUE ~ 'accessory protein'))
+```
+
+## Plot WT velocity distribution
+
+```{r}
+velo_dist <- ggplot(
+  velo_data_WT,
+  aes(x = `velocity [nm/min]`)
+) +
+  # geom_density(aes(fill = `tagged gene`),
+  #              colour = NA,
+  #              alpha = 0.5,
+  #              draw) +
+  stat_density_ridges(aes(
+    y = `tagged gene`,
+    fill = `tagged gene`,
+    # colour = `tagged gene`
+  ),
+  jittered_points = TRUE, 
+  position = "raincloud",
+  colour = "white",
+  point_shape = 21,
+  point_stroke = 0.2,
+  quantile_lines = TRUE,
+  quantiles = 2,
+  alpha = 0.5,
+  size = 0.2
+  ) +
+  scale_colour_manual(values = c(pal_ostwald_disc[c(1, 3)]), aesthetics = c("colour", "fill")) +
+  labs(x = "CSC velocity [nm/min]",
+       y = "Labelled protein") +
+  theme_leo() +
+  theme(legend.position = "none")
+
+pdf("WT_velocities.pdf", width = onecol, height = onecol * 0.5)
+velo_dist
+dev.off()
+```
+
 
 
