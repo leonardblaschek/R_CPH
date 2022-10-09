@@ -179,7 +179,7 @@ velo_dist <- ggplot(
   #              draw) +
   stat_density_ridges(aes(
     y = `tagged gene`,
-    fill = `tagged gene`,
+    fill = `CESA type`,
     # colour = `tagged gene`
   ),
   jittered_points = TRUE, 
