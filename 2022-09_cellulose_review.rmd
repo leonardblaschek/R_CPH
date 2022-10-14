@@ -12,7 +12,11 @@ library(tidyverse)
 library(ggtext)
 library(ggrepel)
 library(ggridges)
+library(tidygraph)
+library(ggraph)
+library(patchwork)
 library(showtext)
+library(tukeygrps)
 
 ## import Helvetica ####
 font_add(
@@ -87,9 +91,11 @@ onehalfcol <- 14 / 2.54
 onecol <- 9 / 2.54
 ```
 
-# CSC velocity to cellulose content regression
+# CSC velocities
 
-## Load relative data
+## CSC velocity to cellulose content regression
+
+### Load relative data
 
 ```{r}
 velo_data <- read_tsv('/home/leonard/Dropbox/2022_molplant_review/velocity_cellulose.tsv') %>% 
@@ -103,54 +109,82 @@ velo_data <- read_tsv('/home/leonard/Dropbox/2022_molplant_review/velocity_cellu
          CESA = case_when(gene_type =='CESA' ~ `mutated gene`,
                           TRUE ~ 'accessory protein')) %>% 
   distinct(perturbation, .keep_all = TRUE) %>% 
-  filter(`perturbation type` != 'drug')
+  filter(`perturbation type` != 'drug') %>% 
+  filter(perturbation != "WT")
 ```
 
-## Calulate regression
+### Calulate regression
 
 ```{r}
-cesa_data <- velo_data %>% filter(perturbation == 'none')
+lm_velo_cellu <- lm(`velocity [% of WT]` ~ `cellulose [% of WT]`,
+   data = velo_data)
+
+rsq <- round(summary(lm_velo_cellu)$adj.r.squared, digits = 2)
 ```
 
 
-## Plot regression
+### Plot regression
 
 ```{r}
 velo_plot <- ggplot(velo_data,
                     aes(x = `velocity [% of WT]`,
                         y = `cellulose [% of WT]`,
-                        colour = colour)) +
+                        # colour = colour
+                        )) +
+  annotate("rect",
+           colour = NA,
+           fill = "grey95",
+           xmin = -Inf,
+           xmax = 53,
+           ymin = 91,
+           ymax = Inf) +
   geom_point(aes(shape = CESA)) +
   geom_smooth(
-    aes(colour = gene_type,
-        linetype = gene_type),
+    aes(
+      # colour = gene_type,
+      # linetype = gene_type
+        ),
     method = 'lm',
-    se = FALSE) +
+    se = FALSE,
+    size = 0.4,
+    colour = "black",
+    linetype = 2) +
   geom_label_repel(
     data = velo_data %>% filter(gene_type != 'CESA'),
     aes(
       label = `perturbation`,
       fontface = face),
     size = ggtext_size,
+    family = "Helvetica",
     label.size = NA,
     label.r = unit(0, 'mm'),
     label.padding = unit(0.5, 'mm'),
     fill = rgb(1, 1, 1, 0.75)
     ) +
-  scale_colour_manual(values = c(pal_ostwald_disc[c(1,3)], 'black'), guide = 'none') +
+  annotate("richtext",
+           label = paste0("R<sup>2</sup> = ", rsq, " <i>(n.s.)</i>"),
+           family = "Helvetica",
+           size = ggtext_size,
+           label.size = NA,
+           y = 40,
+           x = 110) +
+  # scale_colour_manual(values = c(pal_ostwald_disc[c(1,3)], 'black'), guide = 'none') +
   scale_linetype(guide = 'none') +
   scale_shape(name = 'Mutated gene') +
   # scale_y_continuous(limits = c(60, 115)) +
+  labs(y = "Cellulose content [% of WT]",
+       x = "CSC velocity [% of WT]") +
   theme_leo() +
-  theme(legend.position = c(0.2, 0.85))
+  theme(legend.position = c(0.12, 0.85))
 
 pdf("velocity_cellulose.pdf", height = onecol, width = onecol)
 velo_plot
 dev.off()
 ```
-# Distribution of WT velocities
 
-## Load absolute data
+## Distribution of WT velocities
+
+### Load absolute data
 
 ```{r}
 velo_data_WT <- read_tsv('/home/leonard/Dropbox/2022_molplant_review/velocity_cellulose.tsv') %>% 
@@ -163,45 +197,130 @@ velo_data_WT <- read_tsv('/home/leonard/Dropbox/2022_molplant_review/velocity_ce
          face = case_when(`perturbation type` == 'mutation' ~ 'italic',
                           TRUE ~ 'plain'),
          CESA = case_when(gene_type =='CESA' ~ `mutated gene`,
-                          TRUE ~ 'accessory protein'))
+                          TRUE ~ 'accessory protein')) %>% 
+  rename("label" = `tagged gene`,
+         "velocity" = `velocity [nm/min]`)
 ```
 
-## Plot WT velocity distribution
+### Plot WT velocity distribution
 
 ```{r}
+letters <- letter_groups(
+  velo_data_WT,
+  velocity,
+  label,
+  'kruskal',
+  print_position = 'below',
+  print_adjust = 1.5)
+
+medians <- velo_data_WT %>% 
+  group_by(label) %>% 
+  summarise(median = round(median(velocity, na.rm = TRUE)), digits = 0)
+
 velo_dist <- ggplot(
   velo_data_WT,
-  aes(x = `velocity [nm/min]`)
+  aes(x = velocity)
 ) +
-  # geom_density(aes(fill = `tagged gene`),
-  #              colour = NA,
-  #              alpha = 0.5,
-  #              draw) +
   stat_density_ridges(aes(
-    y = `tagged gene`,
+    y = label,
     fill = `CESA type`,
     # colour = `tagged gene`
   ),
   jittered_points = TRUE, 
-  position = "raincloud",
+  position = position_points_jitter(width = 0, height = 0.05),
+  # position = "raincloud",
   colour = "white",
   point_shape = 21,
-  point_stroke = 0.2,
+  point_stroke = 0.1,
+  point_size = 0.8,
   quantile_lines = TRUE,
   quantiles = 2,
-  alpha = 0.5,
-  size = 0.2
+  alpha = 1,
+  size = 0.2,
+  scale = 0.9
   ) +
+  # geom_text(data = letters,
+  #           aes(label = Letters,
+  #               y = label),
+  #           family = 'Helvetica',
+  #           size = ggtext_size) +
+  geom_text(data = medians,
+            aes(x = median,
+                y = label,
+                label = median),
+            family = "Helvetica",
+            size = ggtext_size,
+            colour = 'white',
+            vjust = 0,
+            hjust = 0) +
+  annotate("richtext",
+           label = "&mdash; <i>no significant differences</i> &mdash;",
+           family = "Helvetica",
+           size = ggtext_size,
+           label.size = NA,
+           fill = NA,
+           angle = 90,
+           y = 2.5,
+           x = 500) +
   scale_colour_manual(values = c(pal_ostwald_disc[c(1, 3)]), aesthetics = c("colour", "fill")) +
-  labs(x = "CSC velocity [nm/min]",
+  labs(x = "Velocity at the PM [nm min<sup>–1</sup>]",
        y = "Labelled protein") +
   theme_leo() +
-  theme(legend.position = "none")
+  theme(legend.position = c(0.16, 0.08),
+        legend.title = element_blank(),
+        legend.key.height = unit(1, 'mm'),
+        legend.key.width = unit(4, 'mm'),
+        axis.title.x = element_markdown())
 
-pdf("WT_velocities.pdf", width = onecol, height = onecol * 0.5)
+pdf("WT_velocities.pdf", width = onecol * 0.5, height = onecol * 0.5)
 velo_dist
 dev.off()
 ```
+
+## Combined figure
+
+```{r}
+pdf("Pedersen2022_figureS1.pdf", width = twocol, height = onecol * 0.75)
+velo_plot + velo_dist +
+  plot_layout(ncol = 2, widths = c(2,1)) &
+  plot_annotation(tag_levels = "A") &
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
+dev.off()
+
+```
+
+
+# Transcriptional network of SCW formation
+
+## Load data
+
+```{r}
+network_data <- read_csv("/home/leonard/Dropbox/2022_molplant_review/transcription_network.csv") %>% 
+  as_tbl_graph()
+```
+
+## Plot network
+
+```{r}
+network <- ggraph(network_data, layout = 'graphopt') +
+  geom_edge_fan(aes(colour = effect),
+                 arrow = arrow(length = unit(4, 'mm')), 
+                 end_cap = rectangle(width = 15, height = 7, 'mm')) +
+  geom_edge_loop(aes(colour = effect),
+                 arrow = arrow(length = unit(4, 'mm')), 
+                 end_cap = rectangle(width = 15, height = 7, 'mm')) +
+  geom_node_label(aes(label = name),
+                  family = "Helvetica",
+                  size = ggtext_size) +
+  theme_void()
+  
+
+pdf("expression_network.pdf")
+network
+dev.off()
+```
+
+
 
 
 
