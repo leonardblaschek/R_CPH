@@ -133,11 +133,13 @@ velo_plot <- ggplot(velo_data,
                         )) +
   annotate("rect",
            colour = NA,
-           fill = "grey95",
-           xmin = -Inf,
-           xmax = 53,
-           ymin = 91,
-           ymax = Inf) +
+           fill = pal_ostwald_disc[c(1, 3)],
+           xmin = c(-Inf, 95),
+           xmax = c(95, Inf),
+           ymin = c(95, -Inf),
+           ymax = c(Inf, 95),
+           alpha = 0.5
+           ) +
   geom_point(aes(shape = CESA)) +
   geom_smooth(
     aes(
@@ -162,20 +164,37 @@ velo_plot <- ggplot(velo_data,
     fill = rgb(1, 1, 1, 0.75)
     ) +
   annotate("richtext",
-           label = paste0("R<sup>2</sup> = ", rsq, " <i>(n.s.)</i>"),
+           label = c(
+             paste0("R<sup>2</sup> = ", rsq, " <i>(n.s.)</i>"),
+             "<i><b>reduced velocity, unchanged cellulose</b></i>",
+             "<i><b>unchanged velocity, reduced cellulose</b></i>"
+           ),
            family = "Helvetica",
            size = ggtext_size,
            label.size = NA,
-           y = 40,
-           x = 110) +
-  # scale_colour_manual(values = c(pal_ostwald_disc[c(1,3)], 'black'), guide = 'none') +
+           fill = NA,
+           colour = c("black", "white", "white"),
+           hjust = c(1, 0.5, 0.5),
+           vjust = c(1, 1, 0),
+           angle = c(0, 0, 90),
+           y = c(125, 125, 62.5),
+           x = c(125, 62.5, 125)) +
   scale_linetype(guide = 'none') +
   scale_shape(name = 'Mutated gene') +
-  # scale_y_continuous(limits = c(60, 115)) +
+  scale_y_continuous(limits = c(30, 125), 
+                     expand = expansion(add = 0),
+                     breaks = c(40, 60, 80, 100, 120)) +
+  scale_x_continuous(limits = c(30, 125), 
+                     expand = expansion(add = 0),
+                     breaks = c(40, 60, 80, 100, 120)) +
   labs(y = "Cellulose content [% of WT]",
        x = "CSC velocity [% of WT]") +
   theme_leo() +
-  theme(legend.position = c(0.12, 0.85))
+  theme(
+    # legend.position = c(0.12, 0.85)
+    legend.position = "right"
+    ) +
+  coord_fixed()
 
 pdf("velocity_cellulose.pdf", height = onecol, width = onecol)
 velo_plot
@@ -224,11 +243,9 @@ velo_dist <- ggplot(
   stat_density_ridges(aes(
     y = label,
     fill = `CESA type`,
-    # colour = `tagged gene`
   ),
   jittered_points = TRUE, 
-  position = position_points_jitter(width = 0, height = 0.05),
-  # position = "raincloud",
+  position = position_raincloud(height = 0.1, ygap = 0.01),
   colour = "white",
   point_shape = 21,
   point_stroke = 0.1,
@@ -239,29 +256,35 @@ velo_dist <- ggplot(
   size = 0.2,
   scale = 0.9
   ) +
-  # geom_text(data = letters,
-  #           aes(label = Letters,
-  #               y = label),
-  #           family = 'Helvetica',
-  #           size = ggtext_size) +
   geom_text(data = medians,
             aes(x = median,
                 y = label,
                 label = median),
             family = "Helvetica",
+            fontface = "bold",
             size = ggtext_size,
             colour = 'white',
-            vjust = 0,
-            hjust = 0) +
+            vjust = -0.1,
+            hjust = -0.1) +
   annotate("richtext",
-           label = "&mdash; <i>no significant differences</i> &mdash;",
+           label = c("&mdash; <i>no significant differences</i> &mdash;",
+                     "late stages of<br>differentiation"),
            family = "Helvetica",
            size = ggtext_size,
            label.size = NA,
            fill = NA,
-           angle = 90,
-           y = 2.5,
-           x = 500) +
+           angle = c(90, 0),
+           y = c(2.5, 4.4),
+           x = c(500, 100)) +
+  annotate("curve",
+           y = 4.4,
+           x = 160,
+           yend = 4.25,
+           xend = 183,
+           curvature = -0.3,
+           arrow = arrow(length = unit(1, "mm"),
+                         type = "closed"),
+           size = 0.2) +
   scale_colour_manual(values = c(pal_ostwald_disc[c(1, 3)]), aesthetics = c("colour", "fill")) +
   labs(x = "Velocity at the PM [nm min<sup>–1</sup>]",
        y = "Labelled protein") +
@@ -270,9 +293,10 @@ velo_dist <- ggplot(
         legend.title = element_blank(),
         legend.key.height = unit(1, 'mm'),
         legend.key.width = unit(4, 'mm'),
-        axis.title.x = element_markdown())
+        axis.title.x = element_markdown(),
+        axis.title.y = element_blank())
 
-pdf("WT_velocities.pdf", width = onecol * 0.5, height = onecol * 0.5)
+pdf("WT_velocities.pdf", width = onecol * 0.75, height = onecol)
 velo_dist
 dev.off()
 ```
@@ -280,9 +304,9 @@ dev.off()
 ## Combined figure
 
 ```{r}
-pdf("Pedersen2022_figureS1.pdf", width = twocol, height = onecol * 0.75)
+pdf("Pedersen2022_figureS1.pdf", width = twocol, height = onecol)
 velo_plot + velo_dist +
-  plot_layout(ncol = 2, widths = c(2,1)) &
+  plot_layout(ncol = 2, widths = c(2,1.25)) &
   plot_annotation(tag_levels = "A") &
   theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
 dev.off()
@@ -319,6 +343,45 @@ pdf("expression_network.pdf")
 network
 dev.off()
 ```
+
+# PTM table
+
+## Load data
+
+```{r}
+full_table <- read_tsv("/home/leonard/Dropbox/2022_molplant_review/PTM_table.tsv")
+
+wide_table <- full_table %>% 
+  fill(Modification, Protein) %>% 
+  group_by(Modification, Protein) %>% 
+  mutate(row_ID = row_number()) %>% 
+  unite("Protein_row", Protein, row_ID) %>% 
+  filter(str_detect(Protein_row, "CES")) %>%
+  filter(!(Modification %in% c("Nitrosylation", "Glycosylation", "Acetylation"))) %>% 
+  pivot_wider(
+    names_from = Modification, 
+    values_from = c("Site", "Modified by", "Effect", "Reference"),
+    names_glue = "{Modification}_{.value}"
+    ) %>% 
+  select(
+    Protein_row,
+    Acylation_Site,
+    `Acylation_Modified by`,
+    Acylation_Effect,
+    Acylation_Reference,
+    Phosphorylation_Site,
+    `Phosphorylation_Modified by`,
+    Phosphorylation_Effect,
+    Phosphorylation_Reference,
+    Ubiquitination_Site,
+    `Ubiquitination_Modified by`,
+    Ubiquitination_Effect,
+    Ubiquitination_Reference,
+  )
+
+write_csv(wide_table, "/home/leonard/Dropbox/2022_molplant_review/PTM_table_wide.csv")
+```
+
 
 
 
