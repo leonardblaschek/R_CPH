@@ -1,0 +1,128 @@
+---
+title: "Intracellular localisation of KOR1"
+author: "Leonard Blaschek"
+date: '2022-11-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(ggtext)
+library(ggrepel)
+library(ggridges)
+library(tidygraph)
+library(ggraph)
+library(ggbeeswarm)
+library(patchwork)
+library(showtext)
+library(tukeygrps)
+
+## import Helvetica ####
+font_add(
+  "Helvetica",
+  regular = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Lt.otf",
+  italic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-LtIt.otf",
+  bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Bd.otf",
+  bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-BdIt.otf"
+)
+showtext_auto()
+
+#### generating plot theme ####
+theme_leo <- function(base_size = 6,
+                      base_family = "Helvetica") {
+  theme_minimal(
+    base_size = base_size,
+    base_family = base_family
+  ) %+replace%
+    theme(
+      strip.text = element_markdown(
+        hjust = 0,
+        # face = "italic"
+      ),
+      axis.ticks = element_line(
+        linewidth = 0.125,
+        lineend = "square",
+        color = "black"
+      ),
+      axis.text.x = element_markdown(
+        size = 6,
+        colour = "black",
+        margin = margin(1, 1, 1, 1)
+      ),
+      axis.text.y = element_markdown(
+        colour = "black",
+        size = 6,
+        angle = 0,
+        vjust = 0.5,
+        hjust = 1,
+        margin = margin(1, 1, 1, 1)
+      ),
+      axis.title = element_markdown(
+        colour = "black",
+        size = 6
+      ),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
+      panel.spacing = unit(1.5, "mm"),
+      legend.position = "none",
+      legend.text = element_text(size = 6),
+      legend.key.height = unit(4, "mm"),
+      plot.title = element_markdown(
+        size = 6,
+        hjust = 0
+      ),
+      complete = TRUE
+    )
+}
+
+pal_ostwald_disc <- c(
+  "#275d95",
+  "#e8c245",
+  "#d25952"
+)
+
+# convenience figure size functions
+ggtext_size <- 6 / (14 / 5)
+cm_size <- function(x) x / 2.54
+twocol <- 18 / 2.54
+onehalfcol <- 14 / 2.54
+onecol <- 9 / 2.54
+```
+
+# Pilots
+
+## 2022-11-17
+
+### Load data
+
+```{r}
+pilot_data <- read_csv("/data/2022_KOR1/2022-11_SP5/2022-11-17_quant.csv") %>%
+  group_by(date, genotype, image) %>%
+  mutate(
+    TP = mean(intensity[compartment == "TP"]),
+    rel_to_tp = intensity / TP
+  )
+```
+
+### Plot data
+
+```{r}
+ggplot(
+  pilot_data,
+  aes(
+    x = genotype,
+    y = rel_to_tp
+  )
+) +
+  geom_beeswarm() +
+  geom_violin(
+    draw_quantiles = 0.5,
+    alpha = 0.5
+  ) +
+  theme_leo() +
+  facet_wrap(~compartment,
+             scales = "free_y")
+```
