@@ -26,11 +26,20 @@ font_add(
   bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Bd.otf",
   bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-BdIt.otf"
 )
+
+## import Arial ####
+font_add(
+  "Arial",
+  regular = "/TTF/Arial.TTF",
+  italic = "/TTF/Ariali.TTF",
+  bold = "/TTF/Arialbd.TTF",
+  bolditalic = "/TTF/Arialbi.TTF"
+)
 showtext_auto()
 
 #### generating plot theme ####
-theme_leo <- function(base_size = 6,
-                      base_family = "Helvetica") {
+theme_leo <- function(base_size = 7,
+                      base_family = "Arial") {
   theme_minimal(
     base_size = base_size,
     base_family = base_family
@@ -46,13 +55,13 @@ theme_leo <- function(base_size = 6,
         color = "black"
       ),
       axis.text.x = element_markdown(
-        size = 6,
+        size = 7,
         colour = "black",
         margin = margin(1, 1, 1, 1)
       ),
       axis.text.y = element_markdown(
         colour = "black",
-        size = 6,
+        size = 7,
         angle = 0,
         vjust = 0.5,
         hjust = 1,
@@ -60,7 +69,7 @@ theme_leo <- function(base_size = 6,
       ),
       axis.title = element_markdown(
         colour = "black",
-        size = 6
+        size = 7
       ),
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
@@ -70,7 +79,7 @@ theme_leo <- function(base_size = 6,
       legend.text = element_text(size = 6),
       legend.key.height = unit(4, "mm"),
       plot.title = element_markdown(
-        size = 6,
+        size = 7,
         hjust = 0
       ),
       complete = TRUE
@@ -84,7 +93,7 @@ pal_ostwald_disc <- c(
 )
 
 # convenience figure size functions
-ggtext_size <- 6 / (14 / 5)
+ggtext_size <- 7 / (14 / 5)
 cm_size <- function(x) x / 2.54
 twocol <- 18 / 2.54
 onehalfcol <- 14 / 2.54
@@ -157,7 +166,7 @@ velo_plot <- ggplot(velo_data,
       label = `perturbation`,
       fontface = face),
     size = ggtext_size,
-    family = "Helvetica",
+    family = "Arial",
     label.size = NA,
     label.r = unit(0, 'mm'),
     label.padding = unit(0.5, 'mm'),
@@ -169,7 +178,7 @@ velo_plot <- ggplot(velo_data,
              "<i><b>reduced velocity, unchanged cellulose</b></i>",
              "<i><b>unchanged velocity, reduced cellulose</b></i>"
            ),
-           family = "Helvetica",
+           family = "Arial",
            size = ggtext_size,
            label.size = NA,
            fill = NA,
@@ -192,7 +201,8 @@ velo_plot <- ggplot(velo_data,
   theme_leo() +
   theme(
     # legend.position = c(0.12, 0.85)
-    legend.position = "right"
+    legend.position = "bottom",
+    legend.text = element_text(size = 7)
     ) +
   coord_fixed()
 
@@ -260,7 +270,7 @@ velo_dist <- ggplot(
             aes(x = median,
                 y = label,
                 label = median),
-            family = "Helvetica",
+            family = "Arial",
             fontface = "bold",
             size = ggtext_size,
             colour = 'white',
@@ -269,7 +279,7 @@ velo_dist <- ggplot(
   annotate("richtext",
            label = c("&mdash; <i>no significant differences</i> &mdash;",
                      "late stages of<br>differentiation"),
-           family = "Helvetica",
+           family = "Arial",
            size = ggtext_size,
            label.size = NA,
            fill = NA,
@@ -304,11 +314,11 @@ dev.off()
 ## Combined figure
 
 ```{r}
-pdf("Pedersen2022_figureS1.pdf", width = twocol, height = onecol)
+pdf("Pedersen2022_figureS1.pdf", width = twocol, height = onecol * 1.3)
 velo_plot + velo_dist +
   plot_layout(ncol = 2, widths = c(2,1.25)) &
   plot_annotation(tag_levels = "A") &
-  theme(plot.tag = element_text(size = 10, face = "bold", family = "Helvetica"))
+  theme(plot.tag = element_text(size = 10, face = "bold", family = "Arial"))
 dev.off()
 
 ```
@@ -334,7 +344,7 @@ network <- ggraph(network_data, layout = 'graphopt') +
                  arrow = arrow(length = unit(4, 'mm')), 
                  end_cap = rectangle(width = 15, height = 7, 'mm')) +
   geom_node_label(aes(label = name),
-                  family = "Helvetica",
+                  family = "Arial",
                   size = ggtext_size) +
   theme_void()
   

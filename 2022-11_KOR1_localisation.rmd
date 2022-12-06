@@ -12,8 +12,8 @@ library(tidyverse)
 library(ggtext)
 library(ggrepel)
 library(ggridges)
-library(tidygraph)
-library(ggraph)
+# library(tidygraph)
+# library(ggraph)
 library(ggbeeswarm)
 library(patchwork)
 library(showtext)
@@ -99,30 +99,60 @@ onecol <- 9 / 2.54
 ### Load data
 
 ```{r}
-pilot_data <- read_csv("/data/2022_KOR1/2022-11_SP5/2022-11-17_quant.csv") %>%
-  group_by(date, genotype, image) %>%
+pilot_data <- read_csv("/home/leonard/Dropbox/2022_KORRIGAN/2022-12-01_KOR1/2022-12-01_KOR1.csv") %>%
+  group_by(date, genotype, replicate, image, slice) %>%
   mutate(
     TP = mean(intensity[compartment == "TP"]),
     rel_to_tp = intensity / TP
-  )
+  ) %>% 
+  filter(compartment != "TP")
+
+pilot_avg <- pilot_data %>% 
+  group_by(date, genotype, replicate, image, slice, compartment) %>% 
+  summarise(rel_to_tp = mean(rel_to_tp)) %>% 
+  filter(compartment != "TP")
 ```
 
 ### Plot data
 
 ```{r}
-ggplot(
+letters <- letter_groups(pilot_avg,
+                         rel_to_tp,
+                         genotype,
+                         "tukey",
+                         compartment,
+                         print_position = "above",
+                         table = TRUE)
+
+pilot_loc <- ggplot(
   pilot_data,
   aes(
     x = genotype,
     y = rel_to_tp
   )
 ) +
-  geom_beeswarm() +
+  geom_quasirandom(size = 0.5,
+                alpha = 1) +
   geom_violin(
     draw_quantiles = 0.5,
     alpha = 0.5
   ) +
+  geom_quasirandom(data = pilot_avg,
+                shape = 21,
+                stroke = 0.2,
+                size = 2,
+                fill = "white",
+                colour = "black",
+                width = 0.1) +
+  geom_text(data = letters,
+            aes(label = Letters),
+            family = "Helvetica",
+            size = ggtext_size) +
   theme_leo() +
   facet_wrap(~compartment,
              scales = "free_y")
+
+pdf("KOR1_loc_pilot.pdf", width = onecol, height = onecol)
+pilot_loc
+dev.off()
 ```
