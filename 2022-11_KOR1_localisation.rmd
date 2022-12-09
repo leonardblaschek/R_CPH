@@ -99,7 +99,8 @@ onecol <- 9 / 2.54
 ### Load data
 
 ```{r}
-pilot_data <- read_csv("/home/leonard/Dropbox/2022_KORRIGAN/2022-12-01_KOR1/2022-12-01_KOR1.csv") %>%
+pilot_data <- read_csv("/data/2022_KOR1/2022-12-01_spinning_disk/2022-12-01_KOR1.csv") %>%
+  filter(date != "2022-12-08") %>% # filter out Stellaris intro
   group_by(date, genotype, replicate, image, slice) %>%
   mutate(
     TP = mean(intensity[compartment == "TP"]),
@@ -116,13 +117,22 @@ pilot_avg <- pilot_data %>%
 ### Plot data
 
 ```{r}
+letters_tech <- letter_groups(pilot_data,
+                         rel_to_tp,
+                         genotype,
+                         "tukey",
+                         compartment,
+                         print_position = "above") %>% 
+  select(-Letters)
+
 letters <- letter_groups(pilot_avg,
                          rel_to_tp,
                          genotype,
                          "tukey",
                          compartment,
-                         print_position = "above",
-                         table = TRUE)
+                         print_position = "above") %>% 
+  select(-rel_to_tp) %>% 
+  left_join(letters_tech)
 
 pilot_loc <- ggplot(
   pilot_data,
@@ -138,6 +148,7 @@ pilot_loc <- ggplot(
     alpha = 0.5
   ) +
   geom_quasirandom(data = pilot_avg,
+                # aes(fill = date),
                 shape = 21,
                 stroke = 0.2,
                 size = 2,
