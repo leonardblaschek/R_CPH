@@ -7,6 +7,8 @@ output:
     latex_engine: lualatex
     fig_caption: yes
     fig_height: 6
+    includes:
+      in_header: "preamble.tex"
 mainfont: IBM Plex Sans
 sansfont: IBM Plex Sans
 monofont: Inconsolata
@@ -20,6 +22,7 @@ options(knitr.kable.NA = '')
 library(tidyverse)
 library(kableExtra)
 ```
+
 
 ## Grinding the plant material
 
@@ -84,13 +87,13 @@ Lastly, prepare 1x PBS (10 ml per sample), by diluting the 10x PBS stock (D106) 
 
 ## Protein extraction
 
-During the whole extraction process, *work on ice!*
+During the whole extraction process, **work on ice!**
 
 - Add extraction buffer into the 50 ml falcons containing the ground material. Use a sample:buffer ration of 1:3 (*e.g.* 15 ml of buffer for 5 g of sample).
 - Vortex thoroughly while the buffer is thawing the powder, until you have an even suspension without clumps.
 - Agitate the tubes horizontally at 120 rpm in the cold room (4°C) for at least 30 min. In the meantime:
     - Cool down the Sorvall centrifuge in the chemical room (first one to the left) to 4°C, install the correct rotor (SS-34) and select the respective rotor code (05).
-    - Aliquot 300 µl anti-FLAG (DYKDDDDK) beads per 5 g of sample (beads are stored in the D106 fridge) into an eppendorf tube. *Do not vortex or shake the beads!* Make sure you fully resuspend the beads before aliquoting to get the correct amount of beads per volume.
+    - Aliquot 300 µl anti-FLAG (DYKDDDDK) beads per 5 g of sample (beads are stored in the D106 fridge) into an eppendorf tube. **Do not vortex or shake the beads!** Make sure you fully resuspend the beads before aliquoting to get the correct amount of beads per volume.
     - Equilibrate the beads by adding 1 ml of extraction buffer and incubating on ice for 3--5 min. Use the magnetic rack to remove the buffer, then repeat twice more. Finally resuspend in the starting volume of extraction buffer (*e.g.* 600 µl for 2 samples of 5 g each)
 - Transfer the sample to the round-bottomed centrifuge tubes (in Ouda's office). Equilibrate their weight by adding extraction buffer if necessary.
 - Centrifuge at 12 000 rpm and 4°C for 30 min.
@@ -98,9 +101,9 @@ During the whole extraction process, *work on ice!*
     - Keep 30 µl of supernatant from each sample for Western blot QC.
 - Add 100 µl of equilibrated anti-FLAG beads to each tube.
 - Agitate tubes horizontally (120 rpm) at 4°C for 2 h.
-- Use the magnetic rack to remove the supernatant -- The FLAG-tagged protein are now adsorbed to the beads.
+- Use the magnetic rack to remove the supernatant -- The FLAG-tagged proteins are now adsorbed to the beads.
     - Keep 30 µl of supernatant per sample (10 µl per replicate, pooled) for Western blot QC, discard the rest.
-- Add 500 ml of extraction buffer, then *with a cut pipette tip* transfer the buffer *including beads* to an eppendorf tube.
+- Add 500 ml of extraction buffer, then **with a cut pipette tip** transfer the buffer **including beads** to an eppendorf tube.
 - Add another 500 ml of extraction buffer to the yellow-capped tube to carry over any remaining beads to the eppendorf.
 - Use the magnetic rack to remove the supernatant.
 - Wash the beads three more times in 1 ml extraction buffer. During each wash, remove the tubes from the magnetic rack and invert slowly to wash thoroughly.
@@ -123,12 +126,12 @@ Before sending the sample off for proteomics, check your extracts for tagged pro
     - Assemble everything before loading to make sure the orientation of the gel cassette is correct.
 - Load 10 µl of the Kaleidoscope ladder and the boiled samples.
 - Run gel at 200 V for 30 min.
-- Open a membrane transfer cassette and place the top half face-up on the bottom part of the transfer tray *(The membrane is on top -- do not touch!).*
+- Open a membrane transfer cassette and place the top half face-up on the bottom part of the transfer tray (**The membrane is on top -- do not touch!**).
 - Break the gel out of its plastic casing using the metal spatula, cut away the wells.
 - Carefully move the gel onto the membrane.
 - Cover with the other half of the transfer cassette and clamp the tray tight.
 - Run the 7 min transfer protocol ("1 midi/2 mini gels")
-- Cut the membrane to the size of the gel -- *Note down the orientation of the gel, do not flip the membrane throughout the following steps.*
+- Cut the membrane to the size of the gel -- Note down the orientation of the gel, **do not flip the membrane throughout the following steps.**
 - Block unspecific protein adsorption with 5% milk in 1x TBST for 45 min under agitation.
 - Incubate with 1:10 000 diluted primary FLAG antibodies in 5% milk/1x TBST over night at 4°C.
 - Wash 3 times in 1x TBST for 15 min under agitation.
