@@ -1,0 +1,902 @@
+---
+title: "FERONIA PUP-IT data analysis"
+author: "Leonard Blaschek, PostDoc"
+output:
+  pdf_document:
+    latex_engine: lualatex
+    fig_caption: yes
+    fig_height: 6
+    includes:
+      in_header: rmd_temp.tex
+sansfont: IBM Plex Sans
+monofont: IBM Plex Mono
+bibliography: /home/leonard/Documents/Bibliography/Zotero_lib.bib
+csl: elife.csl
+link-citations: true
+linkcolor: KU
+urlcolor: KU
+citecolor: KU
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE, message = FALSE
+)
+library(biomartr)
+library(eulerr)
+library(limma)
+library(metablastr)
+library(MsCoreUtils)
+library(msqrob2)
+library(patchwork)
+library(QFeatures)
+library(reticulate)
+library(seqinr)
+library(showtext)
+library(tidyverse)
+# use_python("/home/leonard/Applications/mambaforge/envs/blast/bin/python") #laptop
+use_python("/home/leonard/Applications/miniconda3/envs/blast/bin/python") # office
+reticulate::py_config()
+options(timeout = 30000)
+set.seed(1234)
+
+#### import IBMPlexSans ####
+font_add(
+  "IBMPlexSans",
+  regular = "/OFL_fonts/IBMPlexSans-Light.otf",
+  italic = "/OFL_fonts/IBMPlexSans-LightItalic.otf",
+  bold = "/OFL_fonts/IBMPlexSans-SemiBold.otf",
+  bolditalic = "/OFL_fonts/IBMPlexSans-SemiBoldItalic.otf"
+)
+font_add(
+  "IBMPlexMono",
+  regular = "/OFL_fonts/IBMPlexMono-Regular.otf",
+  italic = "/OFL_fonts/IBMPlexMono-Italic.otf",
+  bold = "/OFL_fonts/IBMPlexMono-SemiBold.otf",
+  bolditalic = "/OFL_fonts/IBMPlexMono-SemiBoldItalic.otf"
+)
+showtext_auto()
+
+#### generating plot theme ####
+theme_leo <- function(base_size = 8,
+                      base_family = "IBMPlexMono") {
+  theme_minimal(
+    base_size = base_size,
+    base_family = base_family
+  ) %+replace%
+    theme(
+      strip.text = element_text(hjust = 0, face = "italic"),
+      #       axis.ticks = element_line(
+      #         linewidth = 0.25,
+      #         lineend = "square",
+      #         color = "black"
+      #       ),
+      axis.ticks = element_blank(),
+      axis.text.x = element_text(
+        colour = "black", # flipped coords
+        margin = margin(1, 1, 1, 1),
+        size = 8
+      ),
+      axis.text.y = element_text(
+        colour = "black",
+        angle = 0,
+        vjust = 0.5,
+        hjust = 1,
+        margin = margin(1, 1, 1, 1),
+        size = 8
+      ),
+      axis.title = element_text(size = 8),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      # panel.border = element_rect(fill = NA, color = "black", size = 0.25),
+      panel.spacing = unit(1.5, "mm"),
+      legend.position = "bottom",
+      legend.text = element_text(size = rel(0.8)),
+      legend.key.height = unit(4, "mm"),
+      complete = TRUE
+    )
+}
+
+ggtext_size <- 8 / (14 / 5)
+
+pal_ostwald_disc <- c(
+  "#275d95",
+  "#e8c245",
+  "#d25952"
+)
+```
+
+## Set paths and variables
+
+```{r}
+## Set working folder
+folder <- "/data/PUP-IT/2023-02-22_FER/P0216/R0686/X568/"
+
+## Fill missing values or not
+fill <- TRUE
+
+## Use filled data for quantification?
+filled <- TRUE
+
+## Additional grouping (e.g. independent experiments)
+exp <- quo(exp)
+```
+
+## Pre-process, filter and fill missing values at peptide level
+
+```{r}
+## Load raw MQ output
+peptides <- read_tsv(paste0(folder, "MQoutput/txt/peptides.txt"))
+
+## Filter out contaminants and reverse sequences
+before <- nrow(peptides)
+peptides <- peptides |>
+  filter(is.na(`Potential contaminant`)) |>
+  filter(!(str_detect(Proteins, "CON"))) |>
+  filter(is.na(Reverse))
+after <- nrow(peptides)
+cat(paste0(before - after, " peptides were contaminants or decoys and filtered out."))
+
+## Select protein ID code and Intensity intensities
+proteins <- peptides |>
+  select(Sequence, starts_with("Intensity ")) |>
+  ## Tidy data frame to one row per value
+  pivot_longer(starts_with("Intensity "),
+    names_to = "sample",
+    values_to = "Intensity"
+  ) |>
+  ## Clean column names and replace missing values (0 in the input) with NA
+  mutate(
+    sample = str_remove(sample, fixed("Intensity ")),
+    Intensity = case_when(
+      Intensity == 0 ~ NA_real_,
+      TRUE ~ Intensity
+    )
+  )
+
+## Load sample annotations
+sample_groups <- tibble(sample = unique(proteins[["sample"]])) |>
+  mutate(
+    group = c("bait", rep("control", 3), rep("bait", 5), rep("control", 3)),
+    exp = c(1, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 1)
+  )
+
+write_tsv(sample_groups, paste0(folder, "sample_groups.tsv"))
+
+## Merge with sample groups
+data <- proteins |>
+  left_join(sample_groups)
+
+## Log2 transform
+data <- data |>
+  mutate(Intensity = log2(Intensity))
+
+log2_plot <- ggplot(data, aes(x = Intensity, colour = sample)) +
+  geom_density() +
+  theme_leo() +
+  labs(title = "Log2 transformed peptide intensities") +
+  theme(legend.position = "none")
+
+## Median center
+data <- data |>
+  group_by(sample) |>
+  mutate(
+    median = median(Intensity, na.rm = TRUE),
+    Intensity = Intensity - median
+  )
+
+center_plot <- ggplot(data, aes(x = Intensity, colour = sample)) +
+  geom_density() +
+  theme_leo() +
+  labs(title = "Median-centred peptide intensities") +
+  theme(legend.position = "none")
+
+## Within technical replicates, categorise single missing values as missing-at-random (MAR)
+## and >1 missing values as missing-not-at-random (MNAR)
+missing_defined <- data |>
+  group_by(Sequence, group, !!exp) |>
+  summarise(
+    n = n(),
+    missing_Intensity = sum(is.na(Intensity))
+  ) |>
+  mutate(missing_type = case_when(
+    missing_Intensity > (n * 0.6) ~ "MNAR",
+    TRUE ~ "MAR"
+  ))
+
+missing_across <- missing_defined |>
+  group_by(Sequence) |>
+  summarise(
+    missing_across = sum(missing_Intensity),
+    n_across = sum(n)
+  )
+
+## Merge categories with main data frame
+data <- data |>
+  left_join(missing_defined) |>
+  left_join(missing_across)
+
+## Inspect missing values
+missingness <- data |>
+  group_by(group, Sequence, !!exp) |>
+  summarise(
+    mean = mean(Intensity, na.rm = TRUE),
+    missingness = as.character(missing_Intensity / n)
+  )
+
+missing_plot <- ggplot(missingness, aes(x = mean, fill = missingness)) +
+  geom_histogram(position = "identity") +
+  scale_fill_manual(values = c(pal_ostwald_disc, "grey")) +
+  theme_leo() +
+  labs(title = "Distribution of missing values") +
+  facet_wrap(exp ~ group)
+
+## Filter peptides
+before1 <- nrow(distinct(data, Sequence))
+data <- data |>
+  group_by(Sequence) |>
+  filter(missing_across < (n_across - 1))
+after1 <- nrow(distinct(data, Sequence))
+cat(paste0(before1 - after1, " peptides were detected only once and filtered out."))
+
+before2 <- nrow(distinct(data, Sequence))
+data <- data |>
+  group_by(Sequence) |>
+  filter(min(missing_Intensity) < (min(n) * 0.4))
+after2 <- nrow(distinct(data, Sequence))
+cat(paste0(
+  before2 - after2,
+  " peptides were detected in <60% of replicates in at least one
+group and filtered out.
+  "
+))
+
+n_filtered <- before1 - after2
+
+filter_plot <- ggplot(data, aes(x = Intensity, colour = sample)) +
+  geom_density() +
+  theme_leo() +
+  labs(title = paste("After filtering out", n_filtered, "peptides")) +
+  theme(legend.position = "none")
+
+if (fill == TRUE) {
+  ## Select only MAR data
+  mar_data <- data |>
+    filter(missing_type == "MAR")
+
+  ## Fill MAR data with 95% of the observed minimum value in the respective group
+  mar_out <- mar_data |>
+    group_by(Sequence, group, !!exp) |>
+    mutate(Intensity = case_when(
+      is.na(Intensity) ~
+        (min(Intensity, na.rm = TRUE) - (abs(min(Intensity, na.rm = TRUE)) * 0.05)),
+      TRUE ~ Intensity
+    ))
+
+  ## Combine filled MAR values with still missing MNAR values
+  mnar_wide <- data |>
+    filter(missing_type == "MNAR") |>
+    full_join(mar_out) |>
+    mutate(sample = paste0("Intensity ", sample)) |>
+    pivot_wider(
+      id_cols = "Sequence",
+      names_from = sample,
+      values_from = Intensity
+    )
+
+  ## Make sure columns are in the right order
+  mnar_wide <- select(mnar_wide, Sequence, order(colnames(mnar_wide)))
+
+  ## Transform dataframe to matrix
+  mnar_mat <- mnar_wide |>
+    ungroup() |>
+    select(-c(Sequence)) |>
+    as.matrix()
+
+  ## Name matrix rows and columns
+  dimnames(mnar_mat) <- list(mnar_wide[["Sequence"]], names(mnar_wide)[-1])
+
+  ## Fill MNAR values by minimum imputation
+  mnar_filled <- impute_matrix(mnar_mat, method = "MinProb", sigma = 1)
+
+  ## Transform matrix back into a dataframe in the shape of the input
+  data_filled <- mnar_filled |>
+    as_tibble(rownames = "Sequence")
+
+  filled_plot <- ggplot(data_filled |> pivot_longer(starts_with("Intensity "),
+    names_to = "sample",
+    values_to = "Intensity"
+  ), aes(x = Intensity, colour = sample)) +
+    geom_density() +
+    theme_leo() +
+    labs(title = "Peptide intensities after imputation") +
+    theme(legend.position = "none")
+} else {
+  data_filled <- data |>
+    mutate(sample = paste0("Intensity ", sample)) |>
+    pivot_wider(id_cols = "Sequence", names_from = sample, values_from = Intensity)
+}
+
+## Merge input file with filled values
+filled_input <- peptides |>
+  select(-starts_with("Intensity ")) |>
+  right_join(data_filled, by = "Sequence")
+
+## Output filled .tsv file
+if (fill == TRUE) {
+  write_tsv(filled_input, paste0(folder, "peptides_filled.tsv"))
+} else {
+  write_tsv(filled_input, paste0(folder, "peptides_norm.tsv"))
+}
+
+log2_plot + center_plot + missing_plot + filter_plot + filled_plot +
+  plot_layout(design = "
+              AB
+              CC
+              DE")
+```
+
+## Quantify relative enrichment using MSqRob2
+
+```{r}
+## Load data
+# Load peptide intensity
+if (filled == TRUE) {
+  peptidesFile <- paste0(folder, "peptides_filled.tsv")
+} else {
+  peptidesFile <- paste0(folder, "peptides_norm.tsv")
+}
+
+ecols <- grep(
+  "Intensity\\.",
+  names(read.delim(peptidesFile))
+)
+
+pe <- readQFeatures(
+  table = peptidesFile,
+  fnames = 1,
+  ecol = ecols,
+  name = "peptideNorm", sep = "\t"
+)
+
+# Load metadata
+samples <- colnames(pe)[[1]] |> str_remove(fixed("Intensity."))
+sample_groups <- read_tsv(paste0(folder, "sample_groups.tsv"))
+
+# Merge metadata
+colData(pe)$genotype <- sample_groups$group
+colData(pe)$exp <- sample_groups$exp
+
+export_pep <- as_tibble(rowData(pe[["peptideNorm"]]))
+
+## Filtering (skipped since we aggregate to leading razor proteins)
+# before <- nrow(pe[["peptideNorm"]])
+# # Overlapping protein groups
+# smallest_groups <- smallestUniqueGroups(rowData(pe[["peptideNorm"]])$Proteins)
+# Protein_filter <- rowData(pe[["peptideNorm"]])$Proteins %in% smallest_groups
+# pe <- pe[Protein_filter, , ]
+
+# # Print number of kept peptides
+# after <- nrow(pe[["peptideNorm"]])
+# cat(paste0(before - after, " peptides in overlapping groups were filtered out."))
+
+## Overview on peptide level
+plotMDS(assay(pe[["peptideNorm"]]), main = "Peptide level")
+
+## Create peptide/protein adjacency matrix
+# pep_df <- as_tibble(rowData(pe[["peptideNorm"]]))
+# pep_PSM <- PSMatch::PSM(pep_df, protein = "Proteins", peptide = "Sequence", score = "Score")
+# adj_mat <- PSMatch::makeAdjacencyMatrix(pep_PSM)
+#
+# adjacencyMatrix(pe[["peptideNorm"]]) <- adj_mat
+
+## Summarise to protein level
+pe <- aggregateFeatures(pe,
+  i = "peptideNorm",
+  fcol = "Leading.razor.protein",
+  name = "protein"
+)
+
+plotMDS(assay(pe[["protein"]]), main = "Protein level")
+
+
+# Export processed data
+export_raw <- as_tibble(assay(pe[["protein"]]), rownames = "protein")
+
+## Estimate protein levels
+pe <- msqrob(object = pe, i = "protein", formula = ~ genotype + (1 | exp), overwrite = TRUE)
+# pe <- msqrob(object = pe, i = "protein",
+#              formula = ~ (1|genotype) + (1|exp), ridge = TRUE, overwrite = TRUE)
+
+## Compare genotypes
+# coefs <- names(getCoef(rowData(pe[["protein"]])$msqrobModels[[1]]))[-1]
+# coef_comb_data <- expand.grid(coefs, coefs) |>
+#                   filter(Var1 != Var2)
+#
+# indx <- !duplicated(t(apply(coef_comb_data, 1, sort)))
+#
+# coef_comb <- coef_comb_data[indx, ] |>
+#              unite(contrast, Var1, Var2, sep = " - ") |>
+#              pull(var = contrast, name = NULL)
+#
+# contrast_names <- c(coefs, coef_comb)
+# contrast_list <- paste0(c(coefs, coef_comb), "=0")
+#
+# contrasts <- makeContrast(
+#   contrast_list,
+#   parameterNames = coefs
+# )
+
+contrast_names <- names(getCoef(rowData(pe[["protein"]])$msqrobModels[[1]]))[2]
+contrasts <- makeContrast(
+  "genotypecontrol=0",
+  parameterNames = "genotypecontrol"
+)
+
+pe <- hypothesisTest(object = pe, i = "protein", contrast = contrasts, overwrite = TRUE)
+
+export <- tibble()
+for (i in 1:length(contrast_names)) {
+  ex <- as_tibble(rowData(pe[["protein"]])[[contrast_names[i]]], rownames = "protein") |>
+    mutate(contrast = str_remove_all(contrast_names[i], "genotype")) |>
+    separate(contrast, into = c("group1", "group2"), sep = " - ", fill = "right") |>
+    mutate(group2 = case_when(
+      is.na(group2) ~ unique(sort(sample_groups$group))[1],
+      TRUE ~ group2
+    ))
+
+  export <- export |>
+    bind_rows(ex)
+}
+
+write_tsv(export, paste0(folder, "protein_FC.tsv"))
+```
+
+## Compare MSqRob2 and PRI hits
+
+```{r}
+## Combine MSqRob2 hits, PRI hits and amino acid sequences
+msqrob <- read_tsv(paste0(folder, "protein_FC.tsv")) |>
+          mutate(protein = recode(protein, "sp|Q9SCZ4|FERON_ARATH" = "Q9SCZ4"))
+
+proteome <- as_tibble(
+  unlist(
+    read.fasta(
+      "/home/leonard/Dropbox/PUP-IT_blast/databases/12864_2019_6058_MOESM10_ESM.fasta",
+      seqtype = "AA", as.string = TRUE
+    )
+  ),
+  rownames = "protein"
+) |>
+  dplyr::rename("sequence" = value)
+
+pri <- read_tsv(
+  paste0(folder, "bioinformatics/statistics/mixed/fdr_0.05/regulation table.tsv")
+) |>
+  dplyr::rename("protein" = identifier)
+
+pri_sig <- pri |>
+  filter(padj2 < 0.05 & abs(log2FC) > 1) |>
+  select(protein, group1, group2) |>
+  mutate(sig_PRI = "yes")
+
+pri_inverse <- pri_sig |>
+  dplyr::rename(
+    "group1" = group2,
+    "group2" = group1
+  )
+data <- msqrob |>
+  left_join(bind_rows(pri_sig, pri_inverse)) |>
+  left_join(proteome) |>
+  mutate(
+    sig_PRI = case_when(
+      is.na(sig_PRI) ~ "no",
+      TRUE ~ sig_PRI
+    ),
+    group1 = "FER",
+    group2 = "LTI6b",
+    logFC = -logFC
+  )
+
+qr <- msqrob[["protein"]]
+pr <- pri[["protein"]]
+q_p <- Reduce(intersect, list(qr, pr))
+
+qr_s <- msqrob |>
+  filter(adjPval < 0.05 & logFC < -1) |>
+  pull(protein)
+pr_s <- pri |>
+  filter(padj2 < 0.05 & log2FC > 1) |>
+  pull(protein)
+q_p_s <- Reduce(intersect, list(qr_s, pr_s))
+
+pr_s_q <- Reduce(intersect, list(qr, pr_s))
+
+# Total hits
+fit <- euler(c(
+  "PRI" = length(pr) - length(q_p),
+  "MSqRob w/ imputation" = length(qr) - length(q_p),
+  "MSqRob w/ imputation&PRI" = length(q_p)
+))
+
+total_venn <- plot(fit,
+  quantities = TRUE,
+  main = list(label = "Overlap in identified proteins", fontfamily = "IBMPlexMono"),
+  labels = list(fontfamily = "IBMPlexMono", font = 4),
+  fill = pal_ostwald_disc[c(3, 2)]
+)
+total_venn
+
+# Significant hits
+fit <- euler(c(
+  "PRI" = length(pr_s) - length(q_p_s),
+  "MSqRob w/ imputation" = length(qr_s) - length(q_p_s),
+  "MSqRob w/ imputation&PRI" = length(q_p_s)
+))
+
+sig_venn <- plot(fit,
+  quantities = TRUE,
+  main = list(label = "Overlap in significant hits", fontfamily = "IBMPlexMono"),
+  labels = list(fontfamily = "IBMPlexMono", font = 4),
+  fill = pal_ostwald_disc[c(3, 2)]
+)
+sig_venn
+
+# Significant PRI hits in total msqrob data
+fit <- euler(c(
+  "PRI sig." = length(pr_s) - length(pr_s_q),
+  "MSqRob total" = length(qr) - length(pr_s_q),
+  "MSqRob total&PRI sig." = length(pr_s_q)
+))
+
+sig_venn <- plot(fit,
+                 quantities = TRUE,
+                 main = list(label = "Sig. PRI hits in total MSqRob2 data", fontfamily = "IBMPlexMono"),
+                 labels = list(fontfamily = "IBMPlexMono", font = 4),
+                 fill = pal_ostwald_disc[c(3, 2)]
+                 )
+sig_venn
+
+# Write fasta file with aa sequences
+seqs <- as.list(pull(data, sequence))
+names <- pull(data, protein)
+write.fasta(seqs, names, paste0(folder, "hits.fasta"),
+  open = "w", as.string = FALSE
+)
+```
+
+## Annotate Arabidopsis homologies
+
+```{r}
+## Mmseqs2 homology search
+system(paste0(
+  "mmseqs easy-search ", folder,
+  "hits.fasta /home/leonard/Dropbox/PUP-IT_blast/databases/Araport11_primary_proteome.fa ",
+  folder, "mmseqs2_out.tsv ", folder, "/temp -s 7.5"
+))
+
+# DIAMOND homology search (TO BE TESTED)
+# system(paste0("diamond blastp -q ", folder, "hits.fasta -d /home/leonard/Dropbox/PUP-IT_blast/databases/Araport11_primary_proteome.fa -o ", folder, "diamond_out.tsv -p 12"))
+
+# Merge data frames
+blast <- read_tsv(paste0(folder, "mmseqs2_out.tsv"),
+  col_names = c(
+    "query", "target", "fident",
+    "alnlen", "mismatch", "gapopen",
+    "qstart", "qend", "tstart",
+    "tend", "evalue", "bits"
+  )
+) |>
+  group_by(query) |>
+  mutate("mmseqs2_rank" = row_number()) |>
+  filter(mmseqs2_rank == 1) |>
+  right_join(data, by = c("query" = "protein")) |>
+  mutate(target = case_when(query == "Q9SCZ4" ~ "AT3G51550.1",
+                            TRUE ~ target),
+         fident = case_when(query == "Q9SCZ4" ~ 1,
+                            TRUE ~ fident))
+
+hits <- blast[["target"]]
+
+## Fetch annotations for blast hits
+result_BM <- biomart(
+  genes = hits, # query genes
+  mart = "plants_mart", # subject biomart
+  dataset = "athaliana_eg_gene", # subject dataset
+  attributes = c(
+    "description", "external_synonym", "name_1006", "interpro_description"
+  ), # subject attributes
+  filters = "ensembl_transcript_id" # ID type of the query
+)
+
+# Collapse data frame to one row per blast hit
+results_list <- result_BM |>
+  group_by(ensembl_transcript_id) |>
+  summarise(
+    `A. thaliana synonyms` = paste(unique(external_synonym), collapse = "; "),
+    `A. thaliana GO terms` = paste(unique(name_1006), collapse = "; "),
+    `A. thaliana description` = unique(description),
+    `A. thaliana interpro terms` = paste(
+      unique(interpro_description),
+      collapse = "; "
+    )
+  )
+
+complete <- left_join(blast, results_list, by = c("target" = "ensembl_transcript_id"))
+
+## Export annotated list of blast hits for inspection (xlsx) and downstream read-in (tsv)
+export <- complete |>
+  arrange(group1, group2, desc(logFC)) |>
+  group_by(group1, group2) |>
+  group_split()
+
+write_tsv(complete, paste0(folder, "protein_FC_annotated.tsv"))
+writexl::write_xlsx(export, paste0(folder, "protein_FC_annotated.xlsx"))
+```
+
+## Annotate Arabidopsis homologies in PRI data
+
+```{r}
+## Write fasta file with aa sequences
+pri_data <- pri |>
+            left_join(proteome)
+seqs <- as.list(pull(pri_data, sequence))
+names <- pull(pri_data, protein)
+write.fasta(seqs, names, paste0(folder, "pri_hits.fasta"),
+            open = "w", as.string = FALSE
+            )
+
+## Mmseqs2 homology search
+system(paste0(
+  "mmseqs easy-search ", folder,
+  "pri_hits.fasta /home/leonard/Dropbox/PUP-IT_blast/databases/Araport11_primary_proteome.fa ",
+  folder, "pri_mmseqs2_out.tsv ", folder, "/temp -s 7.5"
+))
+
+# DIAMOND homology search (TO BE TESTED)
+# system(paste0("diamond blastp -q ", folder, "hits.fasta -d /home/leonard/Dropbox/PUP-IT_blast/databases/Araport11_primary_proteome.fa -o ", folder, "diamond_out.tsv -p 12"))
+
+# Merge data frames
+blast <- read_tsv(paste0(folder, "pri_mmseqs2_out.tsv"),
+                  col_names = c(
+                    "query", "target", "fident",
+                    "alnlen", "mismatch", "gapopen",
+                    "qstart", "qend", "tstart",
+                    "tend", "evalue", "bits"
+                  )
+                  ) |>
+         group_by(query) |>
+         mutate("mmseqs2_rank" = row_number()) |>
+         filter(mmseqs2_rank == 1) |>
+         right_join(pri_data, by = c("query" = "protein")) |>
+         mutate(target = case_when(query == "Q9SCZ4" ~ "AT3G51550.1",
+                                   TRUE ~ target),
+                fident = case_when(query == "Q9SCZ4" ~ 1,
+                                   TRUE ~ fident))
+
+hits <- blast[["target"]]
+
+## Fetch annotations for blast hits
+result_BM <- biomart(
+  genes = hits, # query genes
+  mart = "plants_mart", # subject biomart
+  dataset = "athaliana_eg_gene", # subject dataset
+  attributes = c(
+    "description", "external_synonym", "name_1006", "interpro_description"
+  ), # subject attributes
+  filters = "ensembl_transcript_id" # ID type of the query
+)
+
+# Collapse data frame to one row per blast hit
+results_list <- result_BM |>
+                group_by(ensembl_transcript_id) |>
+                summarise(
+                  `A. thaliana synonyms` = paste(unique(external_synonym), collapse = "; "),
+                  `A. thaliana GO terms` = paste(unique(name_1006), collapse = "; "),
+                  `A. thaliana description` = unique(description),
+                  `A. thaliana interpro terms` = paste(
+                    unique(interpro_description),
+                    collapse = "; "
+                )
+                )
+
+complete <- left_join(blast, results_list, by = c("target" = "ensembl_transcript_id"))
+
+## Export annotated list of blast hits for inspection (xlsx) and downstream read-in (tsv)
+export <- complete |>
+          arrange(group1, group2, desc(log2FC)) |>
+          group_by(group1, group2) |>
+          group_split()
+
+write_tsv(complete, paste0(folder, "PRI_protein_FC_annotated.tsv"))
+writexl::write_xlsx(export, paste0(folder, "PRI_protein_FC_annotated.xlsx"))
+```
+
+## Plot and explore data
+
+```{r}
+## Read-in annotated data
+complete <- read_tsv(paste0(folder, "protein_FC_annotated.tsv"))
+
+## Create plot function
+plot_volcano <- function(g1, g2, PRI_only = FALSE, side = "both",
+                         data = complete, label_data = NULL, filter = "detect") {
+  focus <- data |>
+    filter(group1 == g1 & group2 == g2) |>
+    filter(fident > id_cut / 100) |>
+    filter(adjPval < 0.05)
+
+  focus <- if (filter == "detect") {
+    filter(focus, str_detect(!!attrib, fixed(term, ignore_case = TRUE)))
+  } else if (filter == "list"){
+    filter(focus, !!attrib %in% fixed(term, ignore_case = TRUE))
+  } else focus
+
+  focus <- if (PRI_only == TRUE) filter(focus, sig_PRI == "yes") else focus
+  focus <- if (side == "left") {
+    filter(focus, logFC < -1)
+  } else if (side == "right") {
+    filter(focus, logFC > 1)
+  } else {
+    filter(focus, abs(logFC) > 1)
+  }
+
+  focus <- if (!is.null(label_data)) {
+    focus |> mutate(target = str_remove_all(target, "\\..+")) |>
+      right_join(label_data)
+  } else focus
+
+  focus <- focus |>
+           distinct(query, .keep_all = TRUE)
+
+  bg <- complete |>
+    filter(group1 == g1 & group2 == g2) |>
+    anti_join(focus) |>
+    distinct(query, .keep_all = TRUE)
+
+  ggplot(
+    focus,
+    aes(x = logFC, y = -log10(adjPval), shape = sig_PRI)
+  ) +
+    geom_hline(
+      yintercept = -log10(0.05),
+      linewidth = 0.4,
+      linetype = 2,
+    ) +
+    annotate(
+      "segment",
+      y = 0,
+      yend = 0,
+      x = c(4, -4),
+      xend = c(6, -6),
+      colour = pal_ostwald_disc[c(3, 1)],
+      linewidth = 1,
+      linejoin = "mitre",
+      arrow = arrow(angle = 30, length = unit(1, "mm"), ends = "last", type = "closed")
+    ) +
+    annotate(
+      "text",
+      label = c(g1, g2),
+      x = c(5, -5),
+      y = 0.1,
+      hjust = 0.5,
+      family = "IBMPlexMono",
+      fontface = "bold",
+      size = ggtext_size
+    ) +
+    geom_point(
+      data = bg,
+      fill = "grey",
+      colour = "white",
+      shape = 21,
+      stroke = 0.1,
+      size = 1.5,
+      alpha = 1
+    ) +
+    geom_point(
+      aes(fill = logFC),
+      stroke = 0.4,
+      size = 3
+    ) +
+    ggrepel::geom_label_repel(
+      aes(label = !!label_content),
+      family = "IBMPlexMono",
+      size = ggtext_size,
+      colour = "black",
+      fill = rgb(1, 1, 1, 0.5),
+      label.size = NA
+    ) +
+    scale_fill_distiller(
+      palette = "RdYlBu",
+      limits = c(-2, 2),
+      oob = scales::oob_squish,
+      guide = "none"
+    ) +
+    scale_shape_manual(values = c(21, 24)) +
+    labs(
+      shape = paste("Significant in PRI analysis"),
+      title = paste(g1, "vs.", g2)
+    ) +
+    {
+      if (filter == "detect") {
+        labs(
+          subtitle = paste0(
+            "Highlighting hits with >", id_cut, "% identity<br>and ",
+            quo_name(attrib), " containing '", term, "'."
+          )
+        )
+      } else if (filter == "list" | !is.null(label_data)){
+        labs(
+          subtitle = paste0(
+            "Highlighting manually selected hits with >",
+            id_cut, "% identity"
+          )
+        )
+      } else {
+        labs(
+          subtitle = paste0(
+            "Highlighting hits with >",
+            id_cut, "% identity"
+          )
+        )
+      }
+    } +
+    theme_leo() +
+    theme(plot.subtitle = ggtext::element_markdown(lineheight = unit(1.3, "line")))
+}
+
+## Plot all pairwise comparisons
+# Variables
+# # attrib <- quo(target)
+# term <- "cellulose"
+# term <- complete |>
+#         filter(str_detect(`A. thaliana description`, "cellulose") |
+#                str_detect(`A. thaliana GO terms`, "cellulose") |
+#                str_detect(`A. thaliana description`, "Protein phosphatase 2C")) |>
+#         pull(target)
+term <- read_tsv("/home/leonard/Dropbox/PUP-IT_blast/databases/CSC_accessory_proteins.tsv")
+id_cut <- 30
+label_content <- quo(Abbreviation)
+
+test <- read_tsv(paste0(folder, "PRI_protein_FC_annotated.tsv")) |>
+        mutate(target = str_remove_all(target, "\\..")) |>
+        right_join(term)
+
+# List comparisons and the sides of interest
+g_list <- unique(paste(complete$group1, complete$group2, sep = "_"))
+g1_list <- word(g_list, 1, sep = "_")
+g2_list <- word(g_list, 2, sep = "_")
+sides <- c("both")
+
+volc_list <- list()
+for (i in 1:length(g1_list)) {
+  volc_list <- c(volc_list, list(plot_volcano(
+    g1_list[i], g2_list[i],
+    PRI_only = FALSE, side = sides[i], filter = FALSE, label_data = term,
+  )))
+}
+
+volc_list
+
+pdf(paste0(folder, "cellulose_volcanos.pdf"), width = 10, height = 10)
+volc_list
+dev.off()
+
+term <- "oxidative stress"
+attrib <- quo(`A. thaliana GO terms`)
+label_content <- quo(str_extract(`A. thaliana description`, "[^;\\[]+"))
+volc_list <- list()
+for (i in 1:length(g1_list)) {
+  volc_list <- c(volc_list, list(plot_volcano(
+    g1_list[i], g2_list[i],
+    PRI_only = FALSE, side = sides[i], filter = "detect"
+  )))
+}
+
+volc_list
+
+pdf(paste0(folder, "stress_volcanos.pdf"), width = 10, height = 10)
+volc_list
+dev.off()
+```
+
