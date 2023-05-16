@@ -1,0 +1,18 @@
+\usepackage{float}
+\usepackage{xcolor}
+	\definecolor{SU}{RGB}{0, 46, 95}
+	\definecolor{KU}{RGB}{144, 26, 30}
+\usepackage{latexsym} 
+\let\origfigure\figure
+\let\endorigfigure\endfigure
+\renewenvironment{figure}[1][2] {
+    \expandafter\origfigure\expandafter[H]
+} {
+    \endorigfigure
+}
+\usepackage{titling}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{threeparttable}
+\usepackage{colortbl}
+

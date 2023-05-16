@@ -1,0 +1,182 @@
+---
+title: "PKR CRISPR screen"
+author: "Leonard Blaschek, PostDoc"
+output:
+pdf_document:
+latex_engine: lualatex
+fig_caption: yes
+fig_height: 6
+includes:
+in_header: rmd_temp.tex
+sansfont: IBM Plex Sans
+monofont: IBM Plex Mono
+bibliography: /home/leonard/Documents/Bibliography/Zotero_lib.bib
+csl: elife.csl
+link-citations: true
+linkcolor: KU
+urlcolor: KU
+citecolor: KU
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE, message = FALSE
+)
+library(showtext)
+library(tidyverse)
+library(ggbeeswarm)
+library(tukeygrps)
+
+## import Helvetica ####
+# font_add(
+#   "Helvetica",
+#   regular = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Lt.otf",
+#   italic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-LtIt.otf",
+#   bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Bd.otf",
+#   bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-BdIt.otf"
+# )
+font_add(
+  "Helvetica",
+  regular = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-Light.otf",
+  italic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-LightObl.otf",
+  bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-Bold.otf",
+  bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-BoldObl.otf"
+)
+showtext_auto()
+
+#### generating plot theme ####
+theme_leo <- function(base_size = 8,
+                      base_family = "Helvetica") {
+                        theme_minimal(
+                          base_size = base_size,
+                          base_family = base_family
+                        ) %+replace%
+                        theme(
+                          strip.text = element_text(
+                            hjust = 0,
+                            # face = "italic"
+                          ),
+#                           axis.ticks = element_line(
+#                             linewidth = 0.125,
+#                             lineend = "square",
+#                             color = "black"
+#                           ),
+                          axis.ticks = element_blank(),
+                          axis.text.x = element_text(
+                            size = 8,
+                            colour = "black",
+                            margin = margin(1, 1, 1, 1)
+                          ),
+                          axis.text.y = element_text(
+                            colour = "black",
+                            size = 8,
+                            angle = 0,
+                            vjust = 0.5,
+                            hjust = 1,
+                            margin = margin(1, 1, 1, 1)
+                          ),
+                          axis.title = element_text(
+                            colour = "black",
+                            size = 8
+                          ),
+                          panel.grid.major = element_blank(),
+                          panel.grid.minor = element_blank(),
+                          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
+                          panel.spacing = unit(1.5, "mm"),
+                          legend.position = "none",
+                          legend.text = element_text(size = 8),
+                          legend.key.height = unit(4, "mm"),
+                          plot.title = element_text(
+                            size = 8,
+                            hjust = 0
+                          ),
+                          complete = TRUE
+                        )
+                        }
+
+# convenience figure size functions
+ggtext_size <- 8 / (14 / 5)
+cm_size <- function(x) x / 2.54
+twocol <- 18 / 2.54
+onehalfcol <- 14 / 2.54
+onecol <- 9 / 2.54
+
+pal_ostwald_disc <- c(
+  "#275d95",
+  "#e8c245",
+  "#d25952"
+)
+
+pal_ostwald_disc_long <- c(
+  "#8fab1d",
+  "#2d7d73",
+  "#1d566f",
+  "#275d95",
+  "#e8c245",
+  "#d25952"
+)
+```
+
+## 2023-04 hypocotyls
+
+```{r}
+onecm <- 236
+data <- read_tsv("/data/2022_CRISPR_screen/phenotyping/2023-04-24_hypocotyls/lengths.tsv", col_types = "fn") |>
+        mutate(
+          cm = px / 236
+        )
+
+letters <- letter_groups(
+  data,
+  cm,
+  line,
+  "kruskal",
+  print_position = "above"
+)
+
+fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(12)
+
+hyp_length <- ggplot(data,
+       aes(x = reorder(line, -cm),
+           y = cm)) +
+  geom_hline(
+    yintercept = 1.6,
+    linewidth = 0.2,
+    linetype = 2
+  ) +
+  geom_violin(
+    aes(fill = reorder(line, -cm)),
+    draw_quantiles = 0.5,
+    # fill = "white",
+    colour = "black",
+    alpha = 0.75,
+    width = 0.5,
+    size = 0.2,
+    scale = "width"
+  ) +
+  geom_quasirandom(
+    shape = 21,
+    fill = "white",
+    colour = "black",
+    stroke = 0.1,
+    alpha = 1,
+    size = 1,
+    width = 0.2
+  ) +
+  geom_text(
+    data = letters,
+    aes(label = Letters),
+    size = ggtext_size,
+    family = "IBMPlexMono") +
+  labs(
+    y = "Hypocotyl length [cm]",
+    x = "T1 line #"
+  ) +
+  scale_fill_manual(values = rev(fills)) +
+  theme_leo() +
+  theme(legend.position = "none")
+
+pdf("2023-04-24_hypocotyls.pdf", width = onecol, height = onecol * 0.5)
+hyp_length
+dev.off()
+```

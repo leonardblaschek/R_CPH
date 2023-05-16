@@ -1,0 +1,239 @@
+---
+title: "Role of ZFP2 in Silique lignification"
+author: "Leonard Blaschek, PostDoc"
+output:
+pdf_document:
+latex_engine: lualatex
+fig_caption: yes
+fig_height: 6
+includes:
+in_header: rmd_temp.tex
+sansfont: IBM Plex Sans
+monofont: IBM Plex Mono
+bibliography: /home/leonard/Documents/Bibliography/Zotero_lib.bib
+csl: elife.csl
+link-citations: true
+linkcolor: KU
+urlcolor: KU
+citecolor: KU
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE, message = FALSE
+)
+library(showtext)
+library(tidyverse)
+library(ggbeeswarm)
+library(patchwork)
+
+## import Helvetica ####
+font_add(
+  "Helvetica",
+  regular = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-Light.otf",
+  italic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-LightObl.otf",
+  bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-Bold.otf",
+  bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-BoldObl.otf"
+)
+showtext_auto()
+
+#### generating plot theme ####
+theme_leo <- function(base_size = 6,
+                      base_family = "Helvetica") {
+                        theme_minimal(
+                          base_size = base_size,
+                          base_family = base_family
+                        ) %+replace%
+                        theme(
+                          strip.text = element_text(
+                            hjust = 0,
+                            # face = "italic"
+                          ),
+                          axis.ticks = element_line(
+                            linewidth = 0.125,
+                            lineend = "square",
+                            color = "black"
+                          ),
+                          axis.text.x = element_text(
+                            size = 6,
+                            colour = "black",
+                            margin = margin(1, 1, 1, 1)
+                          ),
+                          axis.text.y = element_text(
+                            colour = "black",
+                            size = 6,
+                            angle = 0,
+                            vjust = 0.5,
+                            hjust = 1,
+                            margin = margin(1, 1, 1, 1)
+                          ),
+                          axis.title = element_text(
+                            colour = "black",
+                            size = 6
+                          ),
+                          panel.grid.major = element_blank(),
+                          panel.grid.minor = element_blank(),
+                          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
+                          panel.spacing = unit(1.5, "mm"),
+                          legend.position = "none",
+                          legend.text = element_text(size = 6),
+                          legend.key.height = unit(4, "mm"),
+                          plot.title = element_text(
+                            size = 6,
+                            hjust = 0
+                          ),
+                          complete = TRUE
+                        )
+                        }
+
+# convenience figure size functions
+ggtext_size <- 8 / (14 / 5)
+cm_size <- function(x) x / 2.54
+twocol <- 18 / 2.54
+onehalfcol <- 14 / 2.54
+onecol <- 9 / 2.54
+
+pal_ostwald_disc <- c(
+  "#275d95",
+  "#e8c245",
+  "#d25952"
+)
+```
+
+## 2023-04 Wiesner/AF pilot
+
+```{r}
+## Load AF
+af_data <- read_tsv("/data/2023_zfp2/Silique_imaging/AF/zfp_AF.tsv") |>
+           group_by(genotype, replicate) |>
+           mutate(relative = value / mean(value[cell_type == "parenchyma"])) |>
+           filter(!(cell_type %in% c("parenchyma", "repulum")))
+
+af_plot <- ggplot(af_data,
+                  aes(x = genotype,
+                      y = value)) +
+           geom_violin(
+#              aes(fill = genotype),
+             fill = pal_ostwald_disc[1],
+             draw_quantiles = 0.5,
+             # fill = "white",
+             colour = "black",
+             alpha = 0.75,
+             width = 0.5,
+             size = 0.2,
+             scale = "width"
+           ) +
+           geom_quasirandom(
+             shape = 21,
+             fill = "white",
+             colour = "black",
+             stroke = 0.1,
+             alpha = 1,
+             size = 1,
+             width = 0.2
+           ) +
+           stat_summary(
+             aes(
+               group = replicate,
+#                fill = genotype
+             ),
+             fill = "black",
+             colour = "white",
+             shape = 23,
+             stroke = 0.2,
+             fun = "mean",
+             geom = "point",
+             na.rm = TRUE
+           ) +
+           scale_fill_manual(values = pal_ostwald_disc[c(1,3)]) +
+           facet_wrap(~cell_type) +
+           labs(
+             x = "Genotype",
+             y = "Lignin autofluorescence"
+           ) +
+           theme_leo() +
+           theme(axis.title.x = element_blank())
+
+## Load Wiesner
+W_data <- read_tsv("/data/2023_zfp2/Silique_imaging/Wiesner/zfp_Wiesner.tsv") |>
+           filter(!(cell_type %in% c("parenchyma", "repulum")))
+
+W_plot <- ggplot(W_data,
+                  aes(x = genotype,
+                      y = absorbance)) +
+          geom_violin(
+#             aes(fill = genotype),
+            fill = pal_ostwald_disc[3],
+            draw_quantiles = 0.5,
+            # fill = "white",
+            colour = "black",
+            alpha = 0.75,
+            width = 0.5,
+            size = 0.2,
+            scale = "width"
+          ) +
+          geom_quasirandom(
+            shape = 21,
+            fill = "white",
+            colour = "black",
+            stroke = 0.1,
+            alpha = 1,
+            size = 1,
+            width = 0.2
+          ) +
+          stat_summary(
+            aes(
+              group = replicate,
+#               fill = genotype
+            ),
+            fill = "black",
+            colour = "white",
+            shape = 23,
+            stroke = 0.2,
+            fun = "mean",
+            geom = "point",
+            na.rm = TRUE
+          ) +
+          scale_fill_manual(values = pal_ostwald_disc[c(1,3)]) +
+          facet_wrap(~cell_type) +
+          labs(
+            x = "Genotype",
+            y = "Wiesner absorbance"
+          ) +
+          theme_leo() +
+          theme(axis.title.x = element_blank())
+
+pdf("zfp_pilot.pdf", width = onecol, height = onecol)
+W_plot / af_plot & theme(plot.margin = margin(10,1,10,1))
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

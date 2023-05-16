@@ -19,64 +19,64 @@ library(patchwork)
 library(showtext)
 library(tukeygrps)
 
-## import Helvetica ####
+#### import IBMPlexSans ####
 font_add(
-  "Helvetica",
-  regular = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Lt.otf",
-  italic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-LtIt.otf",
-  bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-Bd.otf",
-  bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaNeueLTStd-BdIt.otf"
+  "IBMPlexSans",
+  regular = "/OFL_fonts/IBMPlexSans-Light.otf",
+  italic = "/OFL_fonts/IBMPlexSans-LightItalic.otf",
+  bold = "/OFL_fonts/IBMPlexSans-SemiBold.otf",
+  bolditalic = "/OFL_fonts/IBMPlexSans-SemiBoldItalic.otf"
+)
+font_add(
+  "IBMPlexMono",
+  regular = "/OFL_fonts/IBMPlexMono-Regular.otf",
+  italic = "/OFL_fonts/IBMPlexMono-Italic.otf",
+  bold = "/OFL_fonts/IBMPlexMono-SemiBold.otf",
+  bolditalic = "/OFL_fonts/IBMPlexMono-SemiBoldItalic.otf"
 )
 showtext_auto()
 
 #### generating plot theme ####
-theme_leo <- function(base_size = 6,
-                      base_family = "Helvetica") {
-  theme_minimal(
-    base_size = base_size,
-    base_family = base_family
-  ) %+replace%
-    theme(
-      strip.text = element_markdown(
-        hjust = 0,
-        # face = "italic"
-      ),
-      axis.ticks = element_line(
-        linewidth = 0.125,
-        lineend = "square",
-        color = "black"
-      ),
-      axis.text.x = element_markdown(
-        size = 6,
-        colour = "black",
-        margin = margin(1, 1, 1, 1)
-      ),
-      axis.text.y = element_markdown(
-        colour = "black",
-        size = 6,
-        angle = 0,
-        vjust = 0.5,
-        hjust = 1,
-        margin = margin(1, 1, 1, 1)
-      ),
-      axis.title = element_markdown(
-        colour = "black",
-        size = 6
-      ),
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
-      panel.spacing = unit(1.5, "mm"),
-      legend.position = "none",
-      legend.text = element_text(size = 6),
-      legend.key.height = unit(4, "mm"),
-      plot.title = element_markdown(
-        size = 6,
-        hjust = 0
-      ),
-      complete = TRUE
-    )
-}
+theme_leo <- function(base_size = 8,
+                      base_family = "IBMPlexMono") {
+                        theme_minimal(
+                          base_size = base_size,
+                          base_family = base_family
+                        ) %+replace%
+                        theme(
+                          strip.text = element_text(hjust = 0, face = "italic"),
+                          #       axis.ticks = element_line(
+                          #         linewidth = 0.25,
+                          #         lineend = "square",
+                          #         color = "black"
+                          #       ),
+                          axis.ticks = element_blank(),
+                          axis.text.x = element_text(
+                            colour = "black", # flipped coords
+                            margin = margin(1, 1, 1, 1),
+                            size = 8
+                          ),
+                          axis.text.y = element_text(
+                            colour = "black",
+                            angle = 0,
+                            vjust = 0.5,
+                            hjust = 1,
+                            margin = margin(1, 1, 1, 1),
+                            size = 8
+                          ),
+                          axis.title = element_text(size = 8),
+                          panel.grid.major = element_blank(),
+                          panel.grid.minor = element_blank(),
+                          # panel.border = element_rect(fill = NA, color = "black", size = 0.25),
+                          panel.spacing = unit(1.5, "mm"),
+                          legend.position = "bottom",
+                          legend.text = element_text(size = rel(0.8)),
+                          legend.key.height = unit(4, "mm"),
+                          complete = TRUE
+                        )
+                        }
+
+ggtext_size <- 8 / (14 / 5)
 
 pal_ostwald_disc <- c(
   "#275d95",
@@ -85,7 +85,7 @@ pal_ostwald_disc <- c(
 )
 
 # convenience figure size functions
-ggtext_size <- 6 / (14 / 5)
+ggtext_size <- 8 / (14 / 5)
 cm_size <- function(x) x / 2.54
 twocol <- 18 / 2.54
 onehalfcol <- 14 / 2.54
@@ -99,26 +99,43 @@ onecol <- 9 / 2.54
 ### Load data
 
 ```{r}
-pilot_data <- read_csv("/data/2022_KOR1/2022-12-01_spinning_disk/2022-12-01_KOR1.csv") %>%
+pilot_data <- read_csv("/data/2022_KOR1/2022_KOR1_localisation/2022-12-01_spinning_disk/2022-12-01_KOR1.csv") %>%
+  mutate(
+    compartment = recode(compartment, "PM (long axis)" = "PM"),
+    genotype = recode(genotype,
+                      "A" = "T43A<br>S46A",
+                      "D" = "T43D<br>S46D")
+  ) |>
   filter(date != "2022-12-08") %>% # filter out Stellaris intro
   group_by(date, genotype, replicate, image, slice) %>%
   mutate(
     TP = mean(intensity[compartment == "TP"]),
-    rel_to_tp = intensity / TP
-  ) %>% 
-  filter(compartment != "TP")
+    rel_to_tp = intensity / TP * 100,
+    CYT = mean(intensity[compartment == "CYT"]),
+    rel_to_cyt = intensity / CYT * 100,
+    VAC = mean(intensity[compartment == "VAC"]),
+    rel_to_vac = intensity / VAC * 100,
+    TGN = mean(intensity[compartment == "TGN"]),
+    rel_to_tgn = intensity / TGN * 100
+  ) |>
+  filter(!(compartment %in% c("VAC", "CYT")))
 
 pilot_avg <- pilot_data %>% 
   group_by(date, genotype, replicate, image, slice, compartment) %>% 
-  summarise(rel_to_tp = mean(rel_to_tp)) %>% 
-  filter(compartment != "TP")
+  summarise(rel_to_tp = mean(rel_to_tp),
+            rel_to_cyt = mean(rel_to_cyt),
+            rel_to_vac = mean(rel_to_vac),
+            rel_to_tgn = mean(rel_to_tgn),
+            intensity = mean(intensity))
 ```
 
 ### Plot data
 
 ```{r}
+value <- quo(rel_to_cyt)
+
 letters_tech <- letter_groups(pilot_data,
-                         rel_to_tp,
+                         !!value,
                          genotype,
                          "tukey",
                          compartment,
@@ -126,44 +143,69 @@ letters_tech <- letter_groups(pilot_data,
   select(-Letters)
 
 letters <- letter_groups(pilot_avg,
-                         rel_to_tp,
+                         !!value,
                          genotype,
                          "tukey",
                          compartment,
                          print_position = "above") %>% 
-  select(-rel_to_tp) %>% 
+  select(-!!value) %>%
   left_join(letters_tech)
 
 pilot_loc <- ggplot(
   pilot_data,
   aes(
     x = genotype,
-    y = rel_to_tp
+    y = !!value
   )
 ) +
-  geom_quasirandom(size = 0.5,
-                alpha = 1) +
   geom_violin(
+    aes(fill = genotype),
+#     fill = pal_ostwald_disc[1],
     draw_quantiles = 0.5,
-    alpha = 0.5
+    # fill = "white",
+    colour = "black",
+    alpha = 0.75,
+    width = 0.5,
+    size = 0.2,
+    scale = "width"
   ) +
-  geom_quasirandom(data = pilot_avg,
-                # aes(fill = date),
-                shape = 21,
-                stroke = 0.2,
-                size = 2,
-                fill = "white",
-                colour = "black",
-                width = 0.1) +
+  geom_quasirandom(
+    shape = 21,
+    fill = "white",
+    colour = "black",
+    stroke = 0.1,
+    alpha = 1,
+    size = 1,
+    width = 0.2
+  ) +
+  stat_summary(
+    aes(
+      group = replicate,
+      #                fill = genotype
+    ),
+    fill = "black",
+    colour = "white",
+    shape = 23,
+    stroke = 0.2,
+    fun = "mean",
+    geom = "point",
+    position = position_jitter(width = 0.1),
+    na.rm = TRUE
+  ) +
   geom_text(data = letters,
             aes(label = Letters),
-            family = "Helvetica",
+            family = "IBMPlexMono",
             size = ggtext_size) +
+  scale_fill_manual(values = pal_ostwald_disc[c(2, 3, 1)]) +
+  labs(y = "Intensity [% of cyt.]") +
   theme_leo() +
+  theme(axis.text.x = element_markdown(),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
   facet_wrap(~compartment,
              scales = "free_y")
 
-pdf("KOR1_loc_pilot.pdf", width = onecol, height = onecol)
+pdf("KOR1_loc_pilot.pdf", width = onehalfcol, height = onecol * 0.5)
 pilot_loc
 dev.off()
 ```
