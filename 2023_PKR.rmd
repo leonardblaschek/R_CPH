@@ -116,14 +116,17 @@ pal_ostwald_disc_long <- c(
   "#d25952"
 )
 
-out_path <- "/data/2022_CRISPR_screen/phenotyping/"
+#### machine dependent paths ####
+datapath <- ifelse(dir.exists("/data/"), "/data/", "/run/media/leonard/CPH/data/")
+
+out_path <- paste0(datapath, "2022_CRISPR_screen/phenotyping/")
 ```
 
 ## 2023-04 hypocotyls
 
 ```{r}
 onecm <- 236
-data <- read_tsv("/data/2022_CRISPR_screen/phenotyping/2023-04-24_hypocotyls/lengths.tsv", col_types = "fn") |>
+data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-04-24_hypocotyls/lengths.tsv"), col_types = "fn") |>
         mutate(
           cm = px / 236
         )
@@ -187,12 +190,12 @@ dev.off()
 
 ```{r}
 onecm <- 236
-data <- read_tsv("/data/2022_CRISPR_screen/phenotyping/2023-07-10_hypocotyls/lengths.tsv", col_types = "fnfn") |>
+data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_hypocotyls/lengths.tsv"), col_types = "fnfn") |>
         mutate(
           cm = px / 236
-        ) 
-        # mutate(line = as.factor(case_when(line %in% c("112", "454", "570", "594", "633", "666", "696") ~ "Col-0",
-        #                         TRUE ~ line)))
+        ) |> 
+        mutate(line = as.factor(case_when(line %in% c("112", "454", "570", "594", "633", "666", "696") ~ "Col-0",
+                                TRUE ~ line)))
 
 letters <- letter_groups(
   data,
@@ -261,6 +264,89 @@ hyp_length <- ggplot(data,
               coord_flip() 
 
 pdf(paste0(out_path, "2023-07-10_hypocotyls.pdf"), height = twocol, width = onecol)
+hyp_length
+dev.off()
+```
+
+## 2023-08 roots
+
+```{r}
+onecm <- 236
+data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_roots/lengths.tsv"), col_types = "fnfn") |>
+        drop_na(px) |> 
+        mutate(
+          cm = px / 236
+        ) |> 
+        mutate(line = as.factor(case_when(line %in% c("112", "454", "570", "594", "633", "666", "696") ~ "Col-0",
+                                TRUE ~ line)))
+
+letters <- letter_groups(
+  data,
+  cm,
+  line,
+  "kruskal",
+  stat_alpha = 0.05,
+  print_position = "above",
+  print_adjust = 0.5
+)
+
+stars <- tibble()
+for (i in 1:length(levels(data$line))) {
+  pval <- with(data, t.test(cm[line == "Col-0"], cm[line == levels(data$line)[i]]))$p.value
+  stars <- bind_rows(stars, tibble(line = levels(data$line)[i], pval = pval))
+}
+stars <- stars |> 
+  mutate(symbol = case_when(pval < 0.001 ~ "***",
+                            pval < 0.01 ~ "**",
+                            pval < 0.05 ~ "*",
+                            TRUE ~ ""))
+
+letters <- letters |> 
+  left_join(stars, by = "line")
+
+fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(data$line)))
+
+hyp_length <- ggplot(data,
+                     aes(x = reorder(line, -cm),
+                         y = cm)) +
+              geom_violin(
+                aes(fill = reorder(line, -cm)),
+                draw_quantiles = 0.5,
+                # fill = "white",
+                colour = "black",
+                alpha = 0.75,
+                width = 0.5,
+                linewidth = 0.2,
+                scale = "width"
+              ) +
+              geom_quasirandom(
+                aes(fill = reorder(line, -cm)),
+                shape = 21,
+                # fill = "white",
+                colour = "black",
+                stroke = 0.1,
+                alpha = 1,
+                size = 1,
+                width = 0.2
+              ) +
+              geom_text(
+                data = letters,
+                aes(label = symbol),
+                size = ggtext_size,
+#                 angle = 90,
+                vjust = 0.75,
+                hjust = 0,
+                family = "Helvetica") +
+              labs(
+                y = "Root length [cm]",
+                x = "T1 line #"
+              ) +
+              scale_fill_manual(values = rev(fills)) +
+              theme_leo() +
+              theme(legend.position = "none") +
+              coord_flip() 
+
+pdf(paste0(out_path, "2023-07-10_roots.pdf"), height = twocol, width = onecol)
 hyp_length
 dev.off()
 ```
