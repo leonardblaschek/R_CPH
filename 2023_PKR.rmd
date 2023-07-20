@@ -188,14 +188,12 @@ dev.off()
 
 ## 2023-07 hypocotyls
 
-```{r}
+```{r include=FALSE}
 onecm <- 236
 data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_hypocotyls/lengths.tsv"), col_types = "fnfn") |>
         mutate(
           cm = px / 236
-        ) |> 
-        mutate(line = as.factor(case_when(line %in% c("112", "454", "570", "594", "633", "666", "696") ~ "Col-0",
-                                TRUE ~ line)))
+        )
 
 letters <- letter_groups(
   data,
@@ -276,9 +274,7 @@ data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_roo
         drop_na(px) |> 
         mutate(
           cm = px / 236
-        ) |> 
-        mutate(line = as.factor(case_when(line %in% c("112", "454", "570", "594", "633", "666", "696") ~ "Col-0",
-                                TRUE ~ line)))
+        )
 
 letters <- letter_groups(
   data,
