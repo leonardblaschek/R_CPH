@@ -1,21 +1,15 @@
 ---
 title: "PKR CRISPR screen"
 author: "Leonard Blaschek, PostDoc"
-output:
-pdf_document:
-latex_engine: lualatex
-fig_caption: yes
-fig_height: 6
-includes:
-in_header: rmd_temp.tex
-sansfont: IBM Plex Sans
-monofont: IBM Plex Mono
-bibliography: /home/leonard/Documents/Bibliography/Zotero_lib.bib
-csl: elife.csl
-link-citations: true
-linkcolor: KU
-urlcolor: KU
-citecolor: KU
+output: 
+  html_document:
+    theme: yeti
+    highlight: kate
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    includes:
+     after_body: PKR_network.html
 ---
 
 ```{r setup, include=FALSE}
@@ -26,6 +20,19 @@ library(showtext)
 library(tidyverse)
 library(ggbeeswarm)
 library(tukeygrps)
+library(seqinr)
+library(biomartr)
+library(metablastr)
+library(reticulate)
+library(kableExtra)
+if (dir.exists("/data/")) {
+  use_python("/home/leonard/Applications/miniconda3/envs/blast/bin/python") # office
+} else {
+  use_python("/home/leonard/Applications/mambaforge/envs/blast/bin/python") # laptop
+}
+reticulate::py_config()
+options(timeout = 30000)
+options(knitr.kable.NA = "")
 
 ## import Helvetica ####
 # font_add(
@@ -47,52 +54,52 @@ showtext_auto()
 #### generating plot theme ####
 theme_leo <- function(base_size = 8,
                       base_family = "Helvetica") {
-                        theme_minimal(
-                          base_size = base_size,
-                          base_family = base_family
-                        ) %+replace%
-                        theme(
-                          strip.text = element_text(
-                            hjust = 0,
-                            # face = "italic"
-                          ),
-#                           axis.ticks = element_line(
-#                             linewidth = 0.125,
-#                             lineend = "square",
-#                             color = "black"
-#                           ),
-                          axis.ticks = element_blank(),
-                          axis.text.x = element_text(
-                            size = 8,
-                            colour = "black",
-                            margin = margin(1, 1, 1, 1)
-                          ),
-                          axis.text.y = element_text(
-                            colour = "black",
-                            size = 8,
-                            angle = 0,
-                            vjust = 0.5,
-                            hjust = 1,
-                            margin = margin(1, 1, 1, 1)
-                          ),
-                          axis.title = element_text(
-                            colour = "black",
-                            size = 8
-                          ),
-                          panel.grid.major = element_blank(),
-                          panel.grid.minor = element_blank(),
-                          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
-                          panel.spacing = unit(1.5, "mm"),
-                          legend.position = "none",
-                          legend.text = element_text(size = 8),
-                          legend.key.height = unit(4, "mm"),
-                          plot.title = element_text(
-                            size = 8,
-                            hjust = 0
-                          ),
-                          complete = TRUE
-                        )
-                        }
+  theme_minimal(
+    base_size = base_size,
+    base_family = base_family
+  ) %+replace%
+    theme(
+      strip.text = element_text(
+        hjust = 0,
+        # face = "italic"
+      ),
+      #                           axis.ticks = element_line(
+      #                             linewidth = 0.125,
+      #                             lineend = "square",
+      #                             color = "black"
+      #                           ),
+      axis.ticks = element_blank(),
+      axis.text.x = element_text(
+        size = 8,
+        colour = "black",
+        margin = margin(1, 1, 1, 1)
+      ),
+      axis.text.y = element_text(
+        colour = "black",
+        size = 8,
+        angle = 0,
+        vjust = 0.5,
+        hjust = 1,
+        margin = margin(1, 1, 1, 1)
+      ),
+      axis.title = element_text(
+        colour = "black",
+        size = 8
+      ),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
+      panel.spacing = unit(1.5, "mm"),
+      legend.position = "none",
+      legend.text = element_text(size = 8),
+      legend.key.height = unit(4, "mm"),
+      plot.title = element_text(
+        size = 8,
+        hjust = 0
+      ),
+      complete = TRUE
+    )
+}
 
 # convenience figure size functions
 ggtext_size <- 8 / (14 / 5)
@@ -122,14 +129,33 @@ datapath <- ifelse(dir.exists("/data/"), "/data/", "/run/media/leonard/CPH/data/
 out_path <- paste0(datapath, "2022_CRISPR_screen/phenotyping/")
 ```
 
-## 2023-04 hypocotyls
+## PKR library
 
 ```{r}
+lib <- read_tsv(paste0(datapath, "/2022_CRISPR_screen/Kinases family CRISPR library.tsv"))
+
+targets <- lib |> 
+  mutate(targets = str_extract_all(targeted_genes, "AT[:alnum:]+")) |> 
+  pull(targets) |> 
+  unlist()
+
+unique_genes <- unique(targets)
+
+print(paste(nrow(lib), "sgRNAs targeting", length(unique_genes), "unique genes encoding for receptors, kinases, phosphatases or receptor ligands."))
+```
+
+
+## 2023-04 hypocotyls
+
+```{r results='hide'}
 onecm <- 236
-data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-04-24_hypocotyls/lengths.tsv"), col_types = "fn") |>
-        mutate(
-          cm = px / 236
-        )
+data <- read_tsv(
+  paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-04-24_hypocotyls/lengths.tsv"),
+  col_types = "fn"
+) |>
+  mutate(
+    cm = px / 236
+  )
 
 letters <- letter_groups(
   data,
@@ -141,9 +167,13 @@ letters <- letter_groups(
 
 fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(12)
 
-hyp_length <- ggplot(data,
-       aes(x = reorder(line, -cm),
-           y = cm)) +
+hyp_length <- ggplot(
+  data,
+  aes(
+    x = reorder(line, -cm),
+    y = cm
+  )
+) +
   geom_hline(
     yintercept = 1.6,
     linewidth = 0.2,
@@ -172,7 +202,8 @@ hyp_length <- ggplot(data,
     data = letters,
     aes(label = Letters),
     size = ggtext_size,
-    family = "IBMPlexMono") +
+    family = "IBMPlexMono"
+  ) +
   labs(
     y = "Hypocotyl length [cm]",
     x = "T1 line #"
@@ -184,16 +215,22 @@ hyp_length <- ggplot(data,
 pdf(paste0(out_path, "2023-04-24_hypocotyls.pdf"), width = onecol, height = onecol * 0.5)
 hyp_length
 dev.off()
+
+print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```
 
 ## 2023-07 hypocotyls
 
-```{r include=FALSE}
+```{r results='hide',fig.height=12,fig.width=8}
 onecm <- 236
-data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_hypocotyls/lengths.tsv"), col_types = "fnfn") |>
-        mutate(
-          cm = px / 236
-        )
+data <- read_tsv(
+  paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_hypocotyls/lengths.tsv"),
+  col_types = "fnfn"
+) |>
+  mutate(
+    cm = px / 236,
+    line = ordered(line, levels = str_sort(levels(line), numeric = TRUE))
+  )
 
 letters <- letter_groups(
   data,
@@ -210,71 +247,98 @@ for (i in 1:length(levels(data$line))) {
   pval <- with(data, t.test(cm[line == "Col-0"], cm[line == levels(data$line)[i]]))$p.value
   stars <- bind_rows(stars, tibble(line = levels(data$line)[i], pval = pval))
 }
-stars <- stars |> 
-  mutate(symbol = case_when(pval < 0.001 ~ "***",
-                            pval < 0.01 ~ "**",
-                            pval < 0.05 ~ "*",
-                            TRUE ~ ""))
+stars <- stars |>
+  mutate(symbol = case_when(
+    pval < 0.001 ~ "***",
+    pval < 0.01 ~ "**",
+    pval < 0.05 ~ "*",
+    TRUE ~ NA
+  ))
 
-letters <- letters |> 
+letters <- letters |>
   left_join(stars, by = "line")
 
 fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(data$line)))
 
-hyp_length <- ggplot(data,
-                     aes(x = reorder(line, -cm),
-                         y = cm)) +
-              geom_violin(
-                aes(fill = reorder(line, -cm)),
-                draw_quantiles = 0.5,
-                # fill = "white",
-                colour = "black",
-                alpha = 0.75,
-                width = 0.5,
-                linewidth = 0.2,
-                scale = "width"
-              ) +
-              geom_quasirandom(
-                aes(fill = reorder(line, -cm)),
-                shape = 21,
-                # fill = "white",
-                colour = "black",
-                stroke = 0.1,
-                alpha = 1,
-                size = 1,
-                width = 0.2
-              ) +
-              geom_text(
-                data = letters,
-                aes(label = symbol),
-                size = ggtext_size,
-#                 angle = 90,
-                vjust = 0.75,
-                hjust = 0,
-                family = "Helvetica") +
-              labs(
-                y = "Hypocotyl length [cm]",
-                x = "T1 line #"
-              ) +
-              scale_fill_manual(values = rev(fills)) +
-              theme_leo() +
-              theme(legend.position = "none") +
-              coord_flip() 
+sig_hyp <- data |>
+  mutate(line = as.character(line)) |>
+  group_by(line) |>
+  summarise(median = median(cm)) |>
+  filter(line %in% c("Col-0", (drop_na(stars, symbol) |> pull(line)))) |>
+  mutate(sig_hyp = case_when(
+    median < median[line == "Col-0"] ~ "↓",
+    TRUE ~ "↑"
+  )) |>
+  filter(line != "Col-0") |>
+  select(-median)
+
+
+hyp_length <- ggplot(
+  data,
+  aes(
+    x = reorder(line, -cm),
+    # x = line,
+    y = cm
+  )
+) +
+  geom_violin(
+    aes(fill = reorder(line, -cm)),
+    draw_quantiles = 0.5,
+    # fill = "white",
+    colour = "black",
+    alpha = 0.75,
+    width = 0.5,
+    linewidth = 0.2,
+    scale = "width"
+  ) +
+  geom_quasirandom(
+    aes(fill = reorder(line, -cm)),
+    shape = 21,
+    # fill = "white",
+    colour = "black",
+    stroke = 0.1,
+    alpha = 1,
+    size = 1,
+    width = 0.2
+  ) +
+  geom_text(
+    data = letters,
+    aes(label = symbol),
+    size = ggtext_size,
+    #                 angle = 90,
+    vjust = 0.75,
+    hjust = 0,
+    family = "Helvetica"
+  ) +
+  labs(
+    y = "Hypocotyl length [cm]",
+    x = "T1 line #"
+  ) +
+  scale_fill_manual(values = rev(fills)) +
+  theme_leo() +
+  theme(legend.position = "none") +
+  coord_flip()
 
 pdf(paste0(out_path, "2023-07-10_hypocotyls.pdf"), height = twocol, width = onecol)
 hyp_length
 dev.off()
+
+print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```
 
 ## 2023-08 roots
 
-```{r}
+```{r results='hide',fig.height=12,fig.width=8}
 onecm <- 236
-data <- read_tsv(paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_roots/lengths.tsv"), col_types = "fnfn") |>
-        drop_na(px) |> 
-        mutate(
-          cm = px / 236
-        )
+data <- read_tsv(
+  paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_roots/lengths.tsv"),
+  col_types = "fnfn"
+) |>
+  drop_na(px) |>
+  mutate(
+    cm = px / 236,
+    line = ordered(line, levels = str_sort(levels(line), numeric = TRUE))
+  )
 
 letters <- letter_groups(
   data,
@@ -291,58 +355,191 @@ for (i in 1:length(levels(data$line))) {
   pval <- with(data, t.test(cm[line == "Col-0"], cm[line == levels(data$line)[i]]))$p.value
   stars <- bind_rows(stars, tibble(line = levels(data$line)[i], pval = pval))
 }
-stars <- stars |> 
-  mutate(symbol = case_when(pval < 0.001 ~ "***",
-                            pval < 0.01 ~ "**",
-                            pval < 0.05 ~ "*",
-                            TRUE ~ ""))
+stars <- stars |>
+  mutate(symbol = case_when(
+    pval < 0.001 ~ "***",
+    pval < 0.01 ~ "**",
+    pval < 0.05 ~ "*",
+    TRUE ~ NA
+  ))
 
-letters <- letters |> 
+letters <- letters |>
   left_join(stars, by = "line")
 
 fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(data$line)))
 
-hyp_length <- ggplot(data,
-                     aes(x = reorder(line, -cm),
-                         y = cm)) +
-              geom_violin(
-                aes(fill = reorder(line, -cm)),
-                draw_quantiles = 0.5,
-                # fill = "white",
-                colour = "black",
-                alpha = 0.75,
-                width = 0.5,
-                linewidth = 0.2,
-                scale = "width"
-              ) +
-              geom_quasirandom(
-                aes(fill = reorder(line, -cm)),
-                shape = 21,
-                # fill = "white",
-                colour = "black",
-                stroke = 0.1,
-                alpha = 1,
-                size = 1,
-                width = 0.2
-              ) +
-              geom_text(
-                data = letters,
-                aes(label = symbol),
-                size = ggtext_size,
-#                 angle = 90,
-                vjust = 0.75,
-                hjust = 0,
-                family = "Helvetica") +
-              labs(
-                y = "Root length [cm]",
-                x = "T1 line #"
-              ) +
-              scale_fill_manual(values = rev(fills)) +
-              theme_leo() +
-              theme(legend.position = "none") +
-              coord_flip() 
+sig_root <- data |>
+  mutate(line = as.character(line)) |>
+  group_by(line) |>
+  summarise(median = median(cm)) |>
+  filter(line %in% c("Col-0", (drop_na(stars, symbol) |> pull(line)))) |>
+  mutate(sig_root = case_when(
+    median < median[line == "Col-0"] ~ "↓",
+    TRUE ~ "↑"
+  )) |>
+  filter(line != "Col-0") |>
+  select(-median)
+
+root_length <- ggplot(
+  data,
+  aes(
+    x = reorder(line, -cm),
+    # x = line,
+    y = cm
+  )
+) +
+  geom_violin(
+    aes(fill = reorder(line, -cm)),
+    draw_quantiles = 0.5,
+    # fill = "white",
+    colour = "black",
+    alpha = 0.75,
+    width = 0.5,
+    linewidth = 0.2,
+    scale = "width"
+  ) +
+  geom_quasirandom(
+    aes(fill = reorder(line, -cm)),
+    shape = 21,
+    # fill = "white",
+    colour = "black",
+    stroke = 0.1,
+    alpha = 1,
+    size = 1,
+    width = 0.2
+  ) +
+  geom_text(
+    data = letters,
+    aes(label = symbol),
+    size = ggtext_size,
+    #                 angle = 90,
+    vjust = 0.75,
+    hjust = 0,
+    family = "Helvetica"
+  ) +
+  labs(
+    y = "Root length [cm]",
+    x = "T1 line #"
+  ) +
+  scale_fill_manual(values = rev(fills)) +
+  theme_leo() +
+  theme(legend.position = "none") +
+  coord_flip()
 
 pdf(paste0(out_path, "2023-07-10_roots.pdf"), height = twocol, width = onecol)
-hyp_length
+root_length
 dev.off()
+
+print(root_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
+```
+
+## Select candidates
+
+```{r}
+lethal <- tibble(
+  line = c("387", "462", "474", "633", "692"),
+  sterile = "🗸"
+)
+
+lines <- full_join(sig_root, sig_hyp) |>
+  full_join(lethal) |>
+  separate(line, into = c("line", "T2 line"), sep = "-")
+
+sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR_line_table.tsv") |>
+  drop_na(Targets) |>
+  mutate(Line = as.character(Line)) |>
+  mutate(targets = str_extract_all(Targets, "[:alnum:]+")) |>
+  select("line" = Line, targets, `Published phenotype`) |>
+  unnest(targets)
+
+write_tsv(sgRNAs, paste0(out_path, "phenotype_targets.tsv"))
+
+sgRNAs <- sgRNAs |>
+  mutate(targets = paste0(targets, ".1"))
+hits <- pull(sgRNAs, targets)
+
+result_BM <- biomart(
+  genes = hits, # query genes
+  mart = "plants_mart", # subject biomart
+  dataset = "athaliana_eg_gene", # subject dataset
+  attributes = c(
+    "description", "external_synonym", "namespace_1003", "name_1006", "interpro_description"
+  ), # subject attributes
+  filters = "ensembl_transcript_id" # ID type of the query
+)
+
+# Collapse data frame to one row per blast hit
+results_list <- result_BM |>
+  group_by(ensembl_transcript_id, external_synonym, description, interpro_description) |>
+  filter(namespace_1003 != "") |>
+  pivot_wider(
+    names_from = namespace_1003,
+    values_from = name_1006,
+    values_fn = ~ paste(sort(unique(.x)), collapse = "; ")
+  ) |>
+  group_by(ensembl_transcript_id) |>
+  summarise(
+    `A. thaliana synonyms` = paste(unique(external_synonym), collapse = "; "),
+    `A. thaliana GO cellular component` = paste(unique(cellular_component), collapse = "; "),
+    `A. thaliana GO biological process` = paste(unique(biological_process), collapse = "; "),
+    `A. thaliana GO molecular function` = paste(unique(molecular_function), collapse = "; "),
+    `A. thaliana description` = unique(description),
+    `A. thaliana interpro terms` = paste(
+      unique(interpro_description),
+      collapse = "; "
+    )
+  )
+
+annotated_lines <- full_join(sgRNAs, results_list, by = c("targets" = "ensembl_transcript_id")) |>
+  full_join(lines)
+# filter(!(is.na(sig_root) & is.na(sig_hyp) & is.na(sterile))) |>
+# filter(str_detect(`A. thaliana GO cellular component`, "membrane|apoplast|extracellular"))
+
+table <- annotated_lines |>
+  mutate(
+    PM = case_when(
+      str_detect(`A. thaliana GO cellular component`, "plasma membrane") ~ "🗸",
+      TRUE ~ NA
+    ),
+    Wall = case_when(
+      str_detect(`A. thaliana GO cellular component`, "apoplast|extracellular") ~ "🗸",
+      TRUE ~ NA
+    )
+  ) |>
+  mutate(line = ordered(as.factor(line), levels = str_sort(levels(as.factor(line)), numeric = TRUE))) |>
+  group_by(line) |>
+  summarise(across(everything(), ~ paste(unique(.x[!is.na(.x)]), collapse = "; "))) |>
+  select(line,
+    targets,
+    `Published phenotype`,
+    `A. thaliana description`,
+    "Root" = sig_root,
+    "Hyp." = sig_hyp,
+    sterile,
+    PM,
+    Wall
+  ) |>
+  mutate(
+    root_col = case_when(Root == "↑" ~ "#275d95", Root == "↓" ~ "#d25952", TRUE ~ "grey"),
+    hyp_col = case_when(Hyp. == "↑" ~ "#275d95", Hyp. == "↓" ~ "#d25952", TRUE ~ "grey"),
+    sterile_col = case_when(sterile == "🗸" ~ "#e8c245", TRUE ~ "grey"),
+    pm_col = case_when(PM == "🗸" ~ "#e8c245", TRUE ~ "grey"),
+    wall_col = case_when(Wall == "🗸" ~ "#e8c245", TRUE ~ "grey")
+  )
+
+
+kable(
+  table |> select(-c(10:14)),
+  "html",
+  caption = "Summary of identified CRISPR targets.",
+  escape = F,
+  align = "llllccccc",
+) |>
+  column_spec(5, background = table$root_col) |>
+  column_spec(6, background = table$hyp_col) |>
+  column_spec(7, background = table$sterile_col) |>
+  column_spec(8, background = table$pm_col) |>
+  column_spec(9, background = table$wall_col) |>
+  column_spec(1:9, border_left = "1px solid white") |>
+  row_spec(1:nrow(table), extra_css = "border-bottom: 1px solid white")
 ```
