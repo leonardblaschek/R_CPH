@@ -132,7 +132,7 @@ out_path <- paste0(datapath, "2022_CRISPR_screen/phenotyping/")
 ## PKR library
 
 ```{r}
-lib <- read_tsv(paste0(datapath, "/2022_CRISPR_screen/Kinases family CRISPR library.tsv"))
+lib <- read_tsv(paste0(datapath, "2022_CRISPR_screen/Kinases family CRISPR library.tsv"))
 
 targets <- lib |> 
   mutate(targets = str_extract_all(targeted_genes, "AT[:alnum:]+")) |> 
@@ -438,14 +438,20 @@ print(root_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```{r}
 lethal <- tibble(
   line = c("387", "462", "474", "633", "692"),
-  sterile = "🗸"
+  Ster. = "🗸"
+)
+
+stem <- tibble(
+  line = c("510", "657", "720"),
+  Stem = "↓"
 )
 
 lines <- full_join(sig_root, sig_hyp) |>
   full_join(lethal) |>
+  full_join(stem) |>
   separate(line, into = c("line", "T2 line"), sep = "-")
 
-sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR_line_table.tsv") |>
+sgRNAs <- read_tsv("/home/leonard/Documents/Latex/2022_labbook/PKR_line_table.tsv") |>
   drop_na(Targets) |>
   mutate(Line = as.character(Line)) |>
   mutate(targets = str_extract_all(Targets, "[:alnum:]+")) |>
@@ -509,37 +515,41 @@ table <- annotated_lines |>
   mutate(line = ordered(as.factor(line), levels = str_sort(levels(as.factor(line)), numeric = TRUE))) |>
   group_by(line) |>
   summarise(across(everything(), ~ paste(unique(.x[!is.na(.x)]), collapse = "; "))) |>
-  select(line,
+  select(
+    line,
     targets,
     `Published phenotype`,
     `A. thaliana description`,
     "Root" = sig_root,
     "Hyp." = sig_hyp,
-    sterile,
+    Stem,
+    Ster.,
     PM,
     Wall
   ) |>
   mutate(
     root_col = case_when(Root == "↑" ~ "#275d95", Root == "↓" ~ "#d25952", TRUE ~ "grey"),
     hyp_col = case_when(Hyp. == "↑" ~ "#275d95", Hyp. == "↓" ~ "#d25952", TRUE ~ "grey"),
-    sterile_col = case_when(sterile == "🗸" ~ "#e8c245", TRUE ~ "grey"),
+    stem_col = case_when(Stem == "↑" ~ "#275d95", Stem == "↓" ~ "#d25952", TRUE ~ "grey"),
+    sterile_col = case_when(Ster. == "🗸" ~ "#e8c245", TRUE ~ "grey"),
     pm_col = case_when(PM == "🗸" ~ "#e8c245", TRUE ~ "grey"),
     wall_col = case_when(Wall == "🗸" ~ "#e8c245", TRUE ~ "grey")
   )
 
 
 kable(
-  table |> select(-c(10:14)),
+  table |> select(-c(11:16)),
   "html",
   caption = "Summary of identified CRISPR targets.",
   escape = F,
-  align = "llllccccc",
+  align = "llllcccccc",
 ) |>
   column_spec(5, background = table$root_col) |>
   column_spec(6, background = table$hyp_col) |>
-  column_spec(7, background = table$sterile_col) |>
-  column_spec(8, background = table$pm_col) |>
-  column_spec(9, background = table$wall_col) |>
-  column_spec(1:9, border_left = "1px solid white") |>
+  column_spec(7, background = table$stem_col) |>
+  column_spec(8, background = table$sterile_col) |>
+  column_spec(9, background = table$pm_col) |>
+  column_spec(10, background = table$wall_col) |>
+  column_spec(1:10, border_left = "1px solid white") |>
   row_spec(1:nrow(table), extra_css = "border-bottom: 1px solid white")
 ```
