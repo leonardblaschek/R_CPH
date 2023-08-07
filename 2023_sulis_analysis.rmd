@@ -136,4 +136,11 @@ highlight_plot
 dev.off()
 ```
 
+# Model evaluation
+
+```{r}
+#TODO: load strategy name and code data, identify prediction for lines E--K and plot predictions vs empiric averages
+```
+
+
 

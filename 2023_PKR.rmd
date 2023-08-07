@@ -142,6 +142,48 @@ targets <- lib |>
 unique_genes <- unique(targets)
 
 print(paste(nrow(lib), "sgRNAs targeting", length(unique_genes), "unique genes encoding for receptors, kinases, phosphatases or receptor ligands."))
+
+hits <- paste0(unique_genes, ".1")
+
+result_BM <- biomart(
+  genes = hits, # query genes
+  mart = "plants_mart", # subject biomart
+  dataset = "athaliana_eg_gene", # subject dataset
+  attributes = c(
+    "description", "external_synonym", "namespace_1003", "name_1006", "interpro_description"
+  ), # subject attributes
+  filters = "ensembl_transcript_id" # ID type of the query
+)
+
+# Collapse data frame to one row per blast hit
+results_list <- result_BM |>
+  group_by(ensembl_transcript_id, external_synonym, description, interpro_description) |>
+  filter(namespace_1003 != "") |>
+  pivot_wider(
+    names_from = namespace_1003,
+    values_from = name_1006,
+    values_fn = ~ paste(sort(unique(.x)), collapse = "; ")
+  ) |>
+  group_by(ensembl_transcript_id) |>
+  summarise(
+    `synonyms` = paste(unique(external_synonym), collapse = "; "),
+    `GO cellular component` = paste(unique(cellular_component), collapse = "; "),
+    `GO biological process` = paste(unique(biological_process), collapse = "; "),
+    `GO molecular function` = paste(unique(molecular_function), collapse = "; "),
+    `description` = unique(description),
+    `interpro terms` = paste(
+      unique(interpro_description),
+      collapse = "; "
+    )
+  )
+
+PKR_groups <- results_list |> 
+  summarise(
+    "kinase" = sum(str_detect(`interpro terms`, "kinase")),
+    "phosphatase" = sum(str_detect(`interpro terms`, "phosphatase")),
+    "*TPase" = sum(str_detect(`interpro terms`, "TPase")),
+    "Gnk2" = sum(str_detect(`interpro terms`, "Gnk2")),
+    )
 ```
 
 
@@ -451,7 +493,7 @@ lines <- full_join(sig_root, sig_hyp) |>
   full_join(stem) |>
   separate(line, into = c("line", "T2 line"), sep = "-")
 
-sgRNAs <- read_tsv("/home/leonard/Documents/Latex/2022_labbook/PKR_line_table.tsv") |>
+sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR_line_table.tsv") |>
   drop_na(Targets) |>
   mutate(Line = as.character(Line)) |>
   mutate(targets = str_extract_all(Targets, "[:alnum:]+")) |>
