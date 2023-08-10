@@ -19,6 +19,8 @@ knitr::opts_chunk$set(
 library(showtext)
 library(tidyverse)
 library(ggbeeswarm)
+library(ggtext)
+library(patchwork)
 library(tukeygrps)
 library(seqinr)
 library(biomartr)
@@ -49,6 +51,10 @@ font_add(
   bold = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-Bold.otf",
   bolditalic = "/prop_fonts/01. Helvetica   [1957 - Max Miedinger]/HelveticaLTStd-BoldObl.otf"
 )
+font_add(
+  "Univers",
+  regular = "/usr/share/fonts/propietary_fonts/Univers/UniversLTStd.otf"
+  )
 showtext_auto()
 
 #### generating plot theme ####
@@ -183,7 +189,180 @@ PKR_groups <- results_list |>
     "phosphatase" = sum(str_detect(`interpro terms`, "phosphatase")),
     "*TPase" = sum(str_detect(`interpro terms`, "TPase")),
     "Gnk2" = sum(str_detect(`interpro terms`, "Gnk2")),
+    "CW" = sum(str_detect(`GO cellular component`, "cell wall|extracellular|apoplast|surface")),
+    "PM" = sum(str_detect(`GO cellular component`, "plasma membrane"))
     )
+```
+
+## Simulation
+
+```{r}
+T1_selection <- tribble(
+  ~Tray, ~`Seed weight [g]`, ~`Seed # min`, ~`Seed # max`, ~Transformants, ~`Efficiency [%]`,
+  "1", 0.525, NA, NA, 36, NA,
+  "2", 0.508, NA, NA, 93, NA,
+  "3", 0.494, NA, NA, 56, NA,
+  "4", 0.507, NA, NA, 57, NA,
+  "5", 0.512, NA, NA, 44, NA,
+  "6", 0.52, NA, NA, 113, NA,
+  "7", 0.552, NA, NA, 111, NA,
+  "8", 0.5, NA, NA, 81, NA,
+  "9", 0.59, NA, NA, 83, NA,
+  "10", 0.58, NA, NA, 73, NA
+) |>
+  mutate(`Seed # max` = round(`Seed weight [g]` / 0.00002, digits = 0),
+         `Seed # min` = round(`Seed weight [g]` / 0.00003, digits = 0))
+
+T1_total <- T1_selection |>
+  drop_na(Transformants) |>
+  summarise(across(where(is.numeric), ~sum(.x, na.rm = T))) |>
+  mutate(Tray = "Screened")
+
+screened <- T1_total |>  pull(Transformants)
+
+T1_pred <- tribble(
+  ~Tray, ~`Seed weight [g]`, ~`Seed count`, ~Transformants, ~`Efficiency [%]`,
+  "Predicted", 32.5, NA, NA, NA,
+) |>
+  mutate(
+    `Seed # max` = round(`Seed weight [g]` / 0.00002, digits = 0),
+    `Seed # min` = round(`Seed weight [g]` / 0.00003, digits = 0),
+    Transformants = round(T1_total$Transformants / T1_total$`Seed weight [g]` * `Seed weight [g]`, digits = 0)
+  )
+
+T1_selection <- T1_selection |>
+  bind_rows(T1_total) |>
+  bind_rows(T1_pred) |>
+  unite("Seed count", `Seed # min`, `Seed # max`, sep = "–", remove = F) |>
+  mutate(
+    `Efficiency [%]` = case_when(
+      !is.na(Transformants) ~ paste0(round(Transformants / `Seed # max` * 100, digits = 3), "–", round(Transformants / `Seed # min` * 100, digits = 3)),
+      TRUE ~ ""
+    )
+  ) |>
+  select(-c(`Seed # min`, `Seed # max`))
+
+pred_T1 <- T1_pred$Transformants
+
+sgRNAs <- 6161
+
+unique_transformants <- tibble()
+step <- 500
+for (n in 1:50) {
+    transformants <- tibble(transformants = c(1:22000)) |>
+        mutate(sgRNA = sample(sgRNAs, n(), replace = TRUE))
+    t_list <- as.list(transformants)
+    for (i in c(seq(0, nrow(transformants), by = step), pred_T1, screened)) {
+        y <- length(unique(t_list$sgRNA[t_list$transformants < (i + 1)]))
+        unique_transformants <- rbind(unique_transformants, tibble(unique_sgRNAs = y, iteration = n, transformant = i))
+    }
+}
+
+halfway <- unique_transformants |>
+    group_by(iteration) |>
+    filter(abs(unique_sgRNAs - (sgRNAs / 3)) == min(abs(unique_sgRNAs - (sgRNAs / 3)))) |>
+    ungroup() |>
+    summarise(
+        range = paste0("<i>", min(transformant), "–", max(transformant), "</i> "),
+        unique_sgRNAs = mean(unique_sgRNAs),
+        transformant = mean(transformant)
+    ) |>
+    mutate(threshold = '33%')
+
+nf <- unique_transformants |>
+    group_by(iteration) |>
+    filter(abs(unique_sgRNAs - (sgRNAs * 0.95)) == min(abs(unique_sgRNAs - (sgRNAs * 0.95)))) |>
+    ungroup() |>
+    summarise(
+        range = paste0("<i>", min(transformant), "–", max(transformant), "</i> "),
+        unique_sgRNAs = mean(unique_sgRNAs),
+        transformant = mean(transformant)
+    ) |>
+    mutate(threshold = '<i>95%</i>')
+
+current <- unique_transformants |>
+  filter(transformant == screened) |>
+  summarise(
+        range = paste0("<i>", mean(transformant), "</i> "),
+        unique_sgRNAs = mean(unique_sgRNAs),
+        transformant = mean(transformant)
+    ) |>
+    mutate(threshold = paste0("<i>", round(unique_sgRNAs / sgRNAs * 100, digits = 0), "%</i>"))
+
+pred <- unique_transformants |>
+  filter(transformant == pred_T1) |>
+  summarise(
+        range = paste0("<i>", mean(transformant), "</i> "),
+        unique_sgRNAs = mean(unique_sgRNAs),
+        transformant = mean(transformant)
+    ) |>
+    mutate(threshold = paste0("<i>", round(unique_sgRNAs / sgRNAs * 100, digits = 0), "%</i>"))
+
+thresholds <- bind_rows(current, pred, nf) |>
+  arrange(desc(transformant))
+
+sim_plot <- ggplot(unique_transformants, aes(x = transformant, y = unique_sgRNAs)) +
+    geom_rect(
+        data = thresholds,
+        aes(
+            xmax = transformant,
+            xmin = -Inf,
+            ymax = unique_sgRNAs,
+            ymin = -Inf,
+            fill = threshold
+        )
+    ) +
+    geom_line(
+        aes(group = iteration),
+        alpha = 0.25,
+        linewidth = 0.2
+    ) +
+    geom_richtext(
+        data = thresholds,
+        aes(
+            x = transformant,
+            y = unique_sgRNAs,
+            label = threshold,
+            colour = threshold
+        ),
+        hjust = 1,
+        vjust = 0,
+        family = "Helvetica",
+        size = ggtext_size,
+        label.size = NA,
+        fill = NA,
+        label.padding = unit(0, "lines"),
+    ) +
+    geom_richtext(
+        data = thresholds,
+        aes(
+            x = transformant,
+            y = unique_sgRNAs,
+            label = range,
+            colour = threshold
+        ),
+        hjust = 1,
+        vjust = 1,
+        angle = 90,
+        family = "Helvetica",
+        size = ggtext_size,
+        label.size = NA,
+        fill = NA,
+        label.padding = unit(c(0.1, 0, 0, 0), "lines")
+    ) +
+    labs(
+        y = 'Unique sgRNAs',
+        x = 'Selected T1 lines') +
+    scale_fill_manual(values = c("#d25952", "#e8c245", "#275d95"), guide = 'none') +
+    scale_colour_manual(values = c("black", "white", "black"), guide = 'none') +
+    scale_x_continuous(expand = expansion(add = 0)) +
+    scale_y_continuous(expand = expansion(add = c(0, 200))) +
+    coord_cartesian(xlim = c(0,19000)) +
+    theme_leo()
+
+pdf(paste0(out_path, "PKR_sim.pdf"), width = twocol, height = onecol)
+sim_plot
+dev.off()
 ```
 
 
@@ -265,7 +444,7 @@ print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 
 ```{r results='hide',fig.height=12,fig.width=8}
 onecm <- 236
-data <- read_tsv(
+hyp_data <- read_tsv(
   paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_hypocotyls/lengths.tsv"),
   col_types = "fnfn"
 ) |>
@@ -275,7 +454,7 @@ data <- read_tsv(
   )
 
 letters <- letter_groups(
-  data,
+  hyp_data,
   cm,
   line,
   "kruskal",
@@ -285,9 +464,9 @@ letters <- letter_groups(
 )
 
 stars <- tibble()
-for (i in 1:length(levels(data$line))) {
-  pval <- with(data, t.test(cm[line == "Col-0"], cm[line == levels(data$line)[i]]))$p.value
-  stars <- bind_rows(stars, tibble(line = levels(data$line)[i], pval = pval))
+for (i in 1:length(levels(hyp_data$line))) {
+  pval <- with(hyp_data, t.test(cm[line == "Col-0"], cm[line == levels(hyp_data$line)[i]]))$p.value
+  stars <- bind_rows(stars, tibble(line = levels(hyp_data$line)[i], pval = pval))
 }
 stars <- stars |>
   mutate(symbol = case_when(
@@ -300,9 +479,9 @@ stars <- stars |>
 letters <- letters |>
   left_join(stars, by = "line")
 
-fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(data$line)))
+fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(hyp_data$line)))
 
-sig_hyp <- data |>
+sig_hyp <- hyp_data |>
   mutate(line = as.character(line)) |>
   group_by(line) |>
   summarise(median = median(cm)) |>
@@ -316,7 +495,7 @@ sig_hyp <- data |>
 
 
 hyp_length <- ggplot(
-  data,
+  hyp_data,
   aes(
     x = reorder(line, -cm),
     # x = line,
@@ -368,11 +547,12 @@ dev.off()
 print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```
 
+
 ## 2023-08 roots
 
 ```{r results='hide',fig.height=12,fig.width=8}
 onecm <- 236
-data <- read_tsv(
+root_data <- read_tsv(
   paste0(datapath, "2022_CRISPR_screen/phenotyping/2023-07-10_roots/lengths.tsv"),
   col_types = "fnfn"
 ) |>
@@ -383,7 +563,7 @@ data <- read_tsv(
   )
 
 letters <- letter_groups(
-  data,
+  root_data,
   cm,
   line,
   "kruskal",
@@ -393,9 +573,9 @@ letters <- letter_groups(
 )
 
 stars <- tibble()
-for (i in 1:length(levels(data$line))) {
-  pval <- with(data, t.test(cm[line == "Col-0"], cm[line == levels(data$line)[i]]))$p.value
-  stars <- bind_rows(stars, tibble(line = levels(data$line)[i], pval = pval))
+for (i in 1:length(levels(root_data$line))) {
+  pval <- with(root_data, t.test(cm[line == "Col-0"], cm[line == levels(root_data$line)[i]]))$p.value
+  stars <- bind_rows(stars, tibble(line = levels(root_data$line)[i], pval = pval))
 }
 stars <- stars |>
   mutate(symbol = case_when(
@@ -408,9 +588,9 @@ stars <- stars |>
 letters <- letters |>
   left_join(stars, by = "line")
 
-fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(data$line)))
+fills <- colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(length(levels(root_data$line)))
 
-sig_root <- data |>
+sig_root <- root_data |>
   mutate(line = as.character(line)) |>
   group_by(line) |>
   summarise(median = median(cm)) |>
@@ -423,7 +603,7 @@ sig_root <- data |>
   select(-median)
 
 root_length <- ggplot(
-  data,
+  root_data,
   aes(
     x = reorder(line, -cm),
     # x = line,
@@ -473,6 +653,52 @@ root_length
 dev.off()
 
 print(root_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
+```
+
+## Proposal figure
+
+
+```{r}
+
+highlights <- c("153", "74-1", "454", "197", "82", "720", "Col-0")
+
+hyp_shadow <- hyp_data |> 
+  group_by(line) |> 
+  filter(!(line %in% highlights)) |> 
+  summarise(count = n())
+
+hyp_length_hl <- hyp_length +
+  geom_tile(
+    data = hyp_shadow,
+    aes(x = line),
+    y = 1,
+    height = Inf,
+    width = 0.7,
+    fill = rgb(1, 1, 1, 0.8)
+  ) +
+  scale_x_discrete(breaks = highlights) +
+  theme(axis.title.y = element_blank())
+
+root_shadow <- root_data |> 
+  group_by(line) |> 
+  filter(!(line %in% highlights)) |> 
+  summarise(count = n())
+
+root_length_hl <- root_length +
+  geom_tile(
+    data = root_shadow,
+    aes(x = line),
+    y = 1,
+    height = Inf,
+    width = 0.7,
+    fill = rgb(1, 1, 1, 0.8)
+  ) +
+  scale_x_discrete(breaks = highlights) +
+  theme(axis.title.y = element_blank())
+
+pdf(paste0(out_path, "NNF_figure_1.pdf"), height = twocol, width = onecol)
+hyp_length_hl + root_length_hl
+dev.off()
 ```
 
 ## Select candidates
