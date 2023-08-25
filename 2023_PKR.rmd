@@ -701,6 +701,61 @@ hyp_length_hl + root_length_hl
 dev.off()
 ```
 
+## Proposal Ganntt
+
+```{r}
+NNF <- tribble(
+  ~Start, ~End, ~Aim, ~Task, ~FTE,
+  1, 5, "1. PPI Networks", "Cloning & transformation", 0.4,
+  5, 10, "1. PPI Networks", "Selection and sample preparation", 0.4,
+  10, 12, "1. PPI Networks", "Proteomics and data analysis", 0.2,
+  1, 5, "2. CRK39 & 40", "Cloning", 0.2,
+  1, 5, "2. CRK39 & 40", "Allelic confirmation", 0.2,
+  5, 9, "2. CRK39 & 40", "Phenotypic complementation", 0.2,
+  9, 14, "2. CRK39 & 40", "Y2H/BiFC confirmation", 0.4,
+  9, 12, "2. CRK39 & 40", "Phosphoproteomics", 0.2,
+  9, 14, "2. CRK39 & 40", "Fluorescence microscopy", 0.4,
+  12, 18, "2. CRK39 & 40", "Genetic conf. of interactors", 0.2,
+  19, 24, "2. CRK39 & 40", "Manuscript preparation", 0.2,
+  5, 22, "2. CRK39 & 40", "Transpose to poplar (Umeå)", 0.1,
+  1, 24, "3. Screening for SCW regulators", "T1 screening", 0.2,
+  3, 24, "3. Screening for SCW regulators", "Microscopy of T1 stems", 0.1,
+  8, 24, "3. Screening for SCW regulators", "PUP-IT of candidates", 0.1
+)
+
+NNF_long <- NNF %>%
+  # mutate(Start = isoweek(Start),
+  #        End = isoweek(End)) %>%
+  gather(date.type, task.date, -c(Aim, Task, FTE)) %>%
+  arrange(date.type, task.date) %>%
+  mutate(Task = factor(Task, levels=rev(unique(Task)), ordered=TRUE))
+
+NNF_gantt <- ggplot(NNF_long, aes(x = forcats::fct_rev(forcats::fct_inorder(Task)), y = task.date, group = interaction(Aim, Task, FTE))) +
+  geom_line(aes(
+    linewidth = FTE,
+    colour = Aim)
+    ) +
+  coord_flip(ylim = c(0, 24)) +
+  labs(x = NULL,
+       y = "Project month") +
+  scale_colour_manual(values = pal_ostwald_disc) +
+  scale_y_continuous(breaks = c(0, 6, 12, 18, 24)) +
+  scale_linewidth(range = c(1, 5.5)) +
+  theme_leo() +
+  theme(axis.text.x = element_text(hjust = 0),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_blank(),
+        strip.text = element_text(face = "bold")) +
+  ggforce::facet_col(~Aim, scales = "free_y", space = "free")
+NNF_gantt
+
+pdf(paste0(out_path, "NNF_gantt_blaschek.pdf"), width = twocol, height = onecol)
+NNF_gantt
+dev.off()
+```
+
+
 ## Select candidates
 
 ```{r}
