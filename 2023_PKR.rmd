@@ -774,7 +774,7 @@ lines <- full_join(sig_root, sig_hyp) |>
   full_join(stem) |>
   separate(line, into = c("line", "T2 line"), sep = "-")
 
-sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR_line_table.tsv") |>
+sgRNAs <- read_tsv("/home/leonard/Documents/Latex/2022_labbook/PKR_line_table.tsv") |>
   drop_na(Targets) |>
   mutate(Line = as.character(Line)) |>
   mutate(targets = str_extract_all(Targets, "[:alnum:]+")) |>
