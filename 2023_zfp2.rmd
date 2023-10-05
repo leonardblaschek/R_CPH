@@ -56,13 +56,13 @@ theme_leo <- function(base_size = 6,
                             color = "black"
                           ),
                           axis.text.x = element_text(
-                            size = 6,
+                            size = base_size,
                             colour = "black",
                             margin = margin(1, 1, 1, 1)
                           ),
                           axis.text.y = element_text(
                             colour = "black",
-                            size = 6,
+                            size = base_size,
                             angle = 0,
                             vjust = 0.5,
                             hjust = 1,
@@ -70,17 +70,17 @@ theme_leo <- function(base_size = 6,
                           ),
                           axis.title = element_text(
                             colour = "black",
-                            size = 6
+                            size = base_size
                           ),
                           panel.grid.major = element_blank(),
                           panel.grid.minor = element_blank(),
                           panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
                           panel.spacing = unit(1.5, "mm"),
                           legend.position = "none",
-                          legend.text = element_text(size = 6),
+                          legend.text = element_text(size = rel(0.8)),
                           legend.key.height = unit(4, "mm"),
                           plot.title = element_text(
-                            size = 6,
+                            size = base_size,
                             hjust = 0
                           ),
                           complete = TRUE
@@ -274,6 +274,121 @@ pdf(paste0("/data/2023_zfp2/", "zfp_funicles.pdf"), width = onecol, height = one
 fun_plot
 dev.off()
 ```
+
+## 2023-09 Timeline sections
+
+### Repulum area
+
+```{r}
+areas <- read_tsv("/data/2023_zfp2/Silique_imaging/Wiesner/2023-09_Wiesner/repulum_areas.tsv")
+
+areas_tot <- areas |> 
+  group_by(genotype, replicate, daf) |> 
+  summarise(total_area = mean(total_area, na.rm = TRUE))
+
+rep_plot <- ggplot(areas,
+                   aes(
+                     x = daf,
+                     y = area
+                   )) +
+  geom_violin(
+    aes(colour = genotype,
+        group = interaction(genotype, daf)),
+    position = position_dodge(width = 0.32),
+    scale = "width",
+    width = 0.3
+  ) +
+  geom_line(
+    stat = "summary",
+    fun.y = "mean",
+    aes(colour = genotype),
+    position = position_dodge(width = 0.32)
+  ) +
+  geom_point(
+    aes(colour = genotype),
+    size = 0.5,
+    alpha = 0.5,
+    shape = 21,
+    fill = "white",
+    position = position_quasirandom(
+      dodge.width = 0.32,
+      width = 0.05)
+  ) +
+  geom_point(
+    stat = "summary",
+    fun.y = "mean",
+    aes(colour = genotype),
+    size = 1,
+    position = position_dodge(width = 0.32)
+  ) +
+  scale_x_continuous(breaks = c(4, 6, 8)) +
+  scale_colour_manual(values = pal_ostwald_disc[c(1,3)]) +
+  labs(
+    x = "DAF",
+    y = "Repulum area [px; transverse section]"
+  ) +
+  theme_leo() +
+  theme(
+    legend.position = c(0.1, 0.9),
+    legend.title = element_blank())
+
+tot_plot <- ggplot(areas_tot,
+                   aes(
+                     x = daf,
+                     y = total_area
+                   )) +
+  geom_violin(
+    aes(colour = genotype,
+        group = interaction(genotype, daf)),
+    position = position_dodge(width = 0.32),
+    scale = "width",
+    width = 0.3
+  ) +
+  geom_line(
+    stat = "summary",
+    fun.y = "mean",
+    aes(colour = genotype),
+    position = position_dodge(width = 0.32)
+  ) +
+  geom_point(
+    aes(colour = genotype),
+    size = 0.5,
+    alpha = 0.5,
+    shape = 21,
+    fill = "white",
+    position = position_quasirandom(
+      dodge.width = 0.32,
+      width = 0.05)
+  ) +
+  geom_point(
+    stat = "summary",
+    fun.y = "mean",
+    aes(colour = genotype),
+    size = 1,
+    position = position_dodge(width = 0.32)
+  ) +
+  scale_x_continuous(breaks = c(4, 6, 8)) +
+  scale_colour_manual(values = pal_ostwald_disc[c(1,3)]) +
+  labs(
+    x = "DAF",
+    y = "Total silique area [px; transverse section]"
+  ) +
+  theme_leo() +
+  theme(
+    legend.position = c(0.1, 0.9),
+    legend.title = element_blank())
+
+
+rep_plot / tot_plot
+
+ggsave(
+  file = "silique_timeline.pdf",
+  width = 90,
+  height = 90,
+  units = "mm"
+)
+```
+
 
 
 
