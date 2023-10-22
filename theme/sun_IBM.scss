@@ -1,0 +1,18 @@
+/*-- scss:defaults --*/
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&family=Inconsolata&display=swap');
+
+// fonts
+$font-family-sans-serif: "IBM Plex Sans", sans-serif !default;
+$font-family-monospace: "Inconsolata", monospace !default;
+
+// colors
+$body-bg: #fff !default;
+$body-color: #000 !default;
+$link-color: #00008b !default;
+$selection-bg: #e8c245 !default;
+$selection-color: #000 !default;
+
+// heading font
+$presentation-heading-font: "Mrs Eaves OT", "Cormorant Garamond", serif !default;
+

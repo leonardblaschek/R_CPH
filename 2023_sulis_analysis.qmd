@@ -1,0 +1,463 @@
+---
+title: "Sulis et al. (2023) re-analysis"
+author: "Leonard Blaschek"
+format:
+  html:
+    embed-resources: true
+    theme: theme/sun_IBM.scss
+    css: theme/styles.css
+comments:
+  hypothesis: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(kableExtra)
+library(ggthemes)
+library(showtext)
+library(scales)
+library(lubridate)
+library(tidyverse)
+library(ggrepel)
+library(ggtext)
+
+options(knitr.kable.NA = "")
+
+#### import IBMPlexSans ####
+font_add(
+  "IBMPlexSans",
+  regular = "/OFL_fonts/IBMPlexSans-Light.otf",
+  italic = "/OFL_fonts/IBMPlexSans-LightItalic.otf",
+  bold = "/OFL_fonts/IBMPlexSans-SemiBold.otf",
+  bolditalic = "/OFL_fonts/IBMPlexSans-SemiBoldItalic.otf"
+)
+font_add(
+  "IBMPlexMono",
+  regular = "/OFL_fonts/IBMPlexMono-Regular.otf",
+  italic = "/OFL_fonts/IBMPlexMono-Italic.otf",
+  bold = "/OFL_fonts/IBMPlexMono-SemiBold.otf",
+  bolditalic = "/OFL_fonts/IBMPlexMono-SemiBoldItalic.otf"
+)
+font_add(
+  "Futura",
+  regular = "/usr/share/fonts/propietary_fonts/Futura/FuturaStd-Medium.otf",
+  italic = "/usr/share/fonts/propietary_fonts/Futura/FuturaStd-MediumOblique.otf",
+  bold = "/usr/share/fonts/propietary_fonts/Futura/FuturaStd-Bold.otf",
+  bolditalic = "/usr/share/fonts/propietary_fonts/Futura/FuturaStd-BoldOblique.otf"
+)
+showtext_auto()
+
+#### generating plot theme ####
+theme_leo <- function(base_size = 20,
+                      base_family = "Futura") {
+  theme_minimal(
+    base_size = base_size,
+    base_family = base_family
+  ) %+replace%
+    theme(
+      strip.text = element_text(hjust = 0, face = "italic"),
+      #       axis.ticks = element_line(
+      #         linewidth = 0.25,
+      #         lineend = "square",
+      #         color = "black"
+      #       ),
+      axis.ticks = element_blank(),
+      axis.text.x = element_text(
+        colour = "black", # flipped coords
+        margin = margin(1, 1, 1, 1),
+        size = base_size
+      ),
+      axis.text.y = element_text(
+        colour = "black",
+        angle = 0,
+        vjust = 0.5,
+        hjust = 1,
+        margin = margin(1, 1, 1, 1),
+        size = base_size
+      ),
+      axis.title = element_text(size = base_size),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(lineend = "square"),
+      # panel.border = element_rect(fill = NA, color = "black", size = 0.25),
+      panel.spacing = unit(1.5, "mm"),
+      legend.position = "bottom",
+      legend.text = element_text(size = rel(0.8)),
+      legend.key.height = unit(4, "mm"),
+      complete = TRUE
+    )
+}
+
+ggtext_size <- 20 / (14 / 5)
+```
+
+Most of us share the instinct to question our findings when presenting them to others. 
+To highlight little quirks in the data that you cannot quite explain. 
+As far as my experience goes, this instinct is strongest early on. 
+*Don't immediately assume your data is just weird artifacts* is among my most commonly given advice when working with Bachelor or Master students. 
+With time, we get a feeling what data we can trust (not a lot) and, when confronted with incisive questioning, might even get a little defensive.
+There is, however, one form of communication that seems to make almost all of us walk back on our instincts and hesitate to share uncertainty: publishing.
+Figures get adjusted until it shows what needs showing, but not much more.
+Quirks, openly shared in the lab, get excluded from the manuscript so as to not invite unwelcome *questions.*
+Why?
+Because these *questions* will delay publication. 
+They might result in calls for additional experiments or even rejection.
+And that is to be avoided — we need that paper published; wee need it for our next grant, the next job, the chance to keep doing this silly job we really like.
+
+# Annotated scatter plot
+
+## Load Data
+
+```{r}
+volume_data <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/volume.tsv")
+height_data <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/lignin.tsv")
+
+data <- full_join(volume_data, height_data, by = "ID") |>
+  mutate(label = case_when(
+    str_detect(ID, "H-4|K-6|K-13|K-9|I-18|J-25") ~ ID,
+    TRUE ~ NA
+  ))
+
+workshop_bar_data <- data |> 
+  filter(!(is.na(label)) | str_detect(ID, "^WT4")) |> 
+  mutate(ID = str_replace(ID, "WT", "WT-")) |> 
+  select(
+    ID, 
+    "lignin" = `Total lignin*`, 
+    "CL" = `C/L ratio`
+    ) |> 
+  separate(ID, into = c("strategy", "line", "replicate")) |> 
+  unite("line", strategy, line, sep = "-") |> 
+  mutate(line = case_when(line == "WT-4" ~ "Wildtype",
+                          TRUE ~ line))
+
+# write_tsv(workshop_bar_data, "Sulis2023_fig3EF.tsv")
+
+sulis_scatter_data <- data |> 
+  filter(!(str_detect(ID, "verage"))) |> 
+  mutate(ID = str_replace(ID, "WT", "WT-")) |>
+  mutate(type = case_when(str_detect(ID, "WT") ~ "Wildtype",
+                           TRUE ~ "CRISPR-edited lines")) |> 
+  select(
+    ID, 
+    type,
+    label,
+    "rel_lignin" = rel_lig, 
+    rel_CL, 
+    "rel_volume" = rel_vol) |> 
+  separate(ID, into = c("strategy", "line", "replicate")) |> 
+  unite("line", strategy, line, sep = "-") |> 
+  mutate(line = case_when(str_detect(line, "WT") ~ "WT",
+                          TRUE ~ line))
+
+# write_tsv(workshop_scatter_data, "Sulis2023_fig3G.tsv")
+```
+
+## Plot lines
+
+```{r}
+panel_K <- ggplot(
+  data = sulis_scatter_data,
+  aes(
+    x = rel_lignin,
+    y = rel_volume
+  )
+) +
+  geom_hline(
+    yintercept = 100,
+    colour = "grey",
+    linetype = "dashed"
+  ) +
+  geom_point(
+    aes(
+      colour = type,
+      fill = after_scale(colorspace::lighten(colour, 0.6))
+    ),
+    shape = "circle filled"
+  ) +
+  geom_label_repel(
+    aes(label = label),
+    size = ggtext_size,
+    label.size = NA,
+    fill = rgb(1, 1, 1, 0.5),
+    min.segment.length = 0,
+    family = "Futura"
+  ) +
+  scale_colour_manual(
+    values = c("#275d95", "#d25952")
+  ) +
+  labs(
+    x = "**Lignin content** (% of wildtype)",
+    y = "<b>Stem volume</b> (% of wildtype)"
+  ) +
+  theme_leo() +
+  theme(
+    axis.title.x = element_markdown(),
+    axis.title.y = element_markdown(),
+    legend.position = c(0.15, 0.95),
+    legend.title = element_blank()
+  )
+
+
+panel_K
+# ggsave(
+#   "/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/sulis_highlight_plot.pdf",
+#   width = 100,
+#   height = 80,
+#   units = "mm"
+# )
+```
+
+# Annotated scatter plot with context
+
+## Load Data
+
+```{r}
+volume_data <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/volume.tsv")
+height_data <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/lignin.tsv")
+
+data <- full_join(volume_data, height_data, by = "ID") |>
+  mutate(label = case_when(
+    str_detect(ID, "H-4|K-6") ~ ID,
+    TRUE ~ NA
+  ))
+
+workshop_bar_data <- data |> 
+  filter(!(is.na(label)) | str_detect(ID, "^WT4")) |> 
+  mutate(ID = str_replace(ID, "WT", "WT-")) |> 
+  select(
+    ID, 
+    "lignin" = `Total lignin*`, 
+    "CL" = `C/L ratio`
+    ) |> 
+  separate(ID, into = c("strategy", "line", "replicate")) |> 
+  unite("line", strategy, line, sep = "-") |> 
+  mutate(line = case_when(line == "WT-4" ~ "Wildtype",
+                          TRUE ~ line))
+
+write_tsv(workshop_bar_data, "Sulis2023_fig3EF.tsv")
+
+workshop_scatter_data <- data |> 
+  filter(!(str_detect(ID, "verage"))) |> 
+  mutate(ID = str_replace(ID, "WT", "WT-")) |>
+  mutate(type = case_when(str_detect(ID, "WT") ~ "Wildtype",
+                           TRUE ~ "CRISPR-edited lines")) |> 
+  select(
+    ID, 
+    type,
+    label,
+    "rel_lignin" = rel_lig, 
+    rel_CL, 
+    "rel_volume" = rel_vol) |> 
+  separate(ID, into = c("strategy", "line", "replicate")) |> 
+  unite("line", strategy, line, sep = "-") |> 
+  mutate(line = case_when(str_detect(line, "WT") ~ "WT",
+                          TRUE ~ line))
+
+# write_tsv(workshop_scatter_data, "Sulis2023_fig3G.tsv")
+```
+
+## Plot lines
+
+```{r}
+sulis_scatter_data <- read_tsv("/home/leonard/Applications/R_scripts/2023_ggplot2_workshop/data/Sulis2023_fig3G.tsv")
+
+lit_data <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/lit.tsv") |> 
+  mutate(vol = height * pi * (diameter/2)^2) |> 
+  group_by(paper) |> 
+  mutate(rel_volume = vol / vol[line == "WT"] * 100,
+         rel_lignin = lignin / lignin[line == "WT"] * 100,
+         label = paper,
+         type = "Literature") |> 
+  filter(line != "WT") |> 
+  select(rel_lignin, rel_volume, type, label)
+
+sulis_scatter_data <- bind_rows(sulis_scatter_data, lit_data)
+
+panel_K <- ggplot(
+  data = sulis_scatter_data,
+  aes(
+    x = rel_lignin,
+    y = rel_volume
+  )
+) +
+  geom_hline(
+    yintercept = 100,
+    colour = "grey",
+    linetype = "dashed"
+  ) +
+  geom_point(
+    aes(
+      colour = type,
+      shape = type,
+      fill = after_scale(colorspace::lighten(colour, 0.6))
+    ),
+    # shape = "circle filled"
+  ) +
+  geom_label_repel(
+    aes(label = label),
+    size = ggtext_size,
+    label.size = NA,
+    fill = rgb(1, 1, 1, 0.5),
+    min.segment.length = 0,
+    family = "Futura"
+  ) +
+  scale_colour_manual(
+    values = c("#275d95", "#e8c245", "#d25952")
+  ) +
+  scale_shape_manual(
+    values = c("circle filled", "square filled", "circle filled")
+    ) +
+  labs(
+    x = "**Lignin content** (% of wildtype)",
+    y = "<b>Stem volume</b> (% of wildtype)"
+  ) +
+  theme_leo() +
+  theme(
+    axis.title.x = element_markdown(),
+    axis.title.y = element_markdown(),
+    legend.position = c(0.15, 0.95),
+    legend.title = element_blank()
+  )
+
+
+panel_K
+# ggsave(
+#   "/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/sulis_highlight_plot_context.pdf",
+#   width = 100,
+#   height = 80,
+#   units = "mm"
+# )
+```
+
+# Model evaluation
+
+## Load data
+
+```{r}
+actual <- data |>
+  separate(ID, into = c("code", "line", "rep")) |>
+  select(
+    "code",
+    "line",
+    "rep",
+    "Lignin content" = rel_lig,
+    "Total sugar" = 28,
+    "C/L ratio" = rel_CL,
+    "Height" = rel_height,
+    "Diameter" = rel_diam,
+    "Volume" = rel_vol
+  ) |> 
+  pivot_longer(-c(code, line, rep), names_to = "variable", values_to = "actual")
+
+pred <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/predictions.tsv")
+codes <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/strategies_codes.tsv")
+numbers <- read_tsv("/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/strategies_number.tsv")
+
+selected_lines <- numbers |>
+  left_join(codes) |>
+  filter(!(is.na(code))) |>
+  select(Strategies, code)
+
+eval_data <- pred |>
+  right_join(selected_lines) |>
+  select(code, Strategies, c(5:29)) |>
+  pivot_longer(-c(code, Strategies), names_to = "variable", values_to = "predicted") |> 
+  right_join(actual, by = c("code", "variable")) |> 
+  drop_na(predicted) |> 
+  group_by(code, variable) |> 
+  summarise(
+    actual = median(actual, na.rm = T),
+    predicted = unique(predicted))
+
+workshop_pred_data <- pred |> 
+  select("strategies" = Strategies,
+         "target_genes" = `Number of targeting genes`,
+         "rel_lignin" = `Lignin content`,
+         "rel_CL" = `C/L ratio`,
+         "rel_volume" = Volume)
+
+# write_tsv(workshop_pred_data, "Sulis2023_predictions.tsv")
+
+```
+
+## Plot model performance
+
+```{r}
+under50 <- tibble(actual = c(1:300)) |> 
+  mutate(predicted = actual * 0.5,
+         group = "under") |> 
+  add_row(actual = 300, predicted = 0, group = "under")
+
+over50 <- tibble(actual = c(1:300)) |> 
+  mutate(predicted = actual * 2,
+         group = "over") |> 
+  add_row(actual = 0, predicted = 300, group = "over")
+
+off50 <- bind_rows(under50, over50) 
+
+eval_plot <- ggplot(
+  eval_data,
+  aes(
+    x = actual,
+    y = predicted
+  )
+) +
+  geom_polygon(
+    data = off50,
+    aes(fill = group, group = group)
+  ) +
+  annotate(
+    "text",
+    label = "< 50% ",
+    x = 280,
+    y = 30,
+    colour = "white",
+    size = ggtext_size,
+    hjust = 1,
+    fontface = "italic",
+    family = "Futura"
+  ) +
+  annotate(
+    "text",
+    label = "> 200% ",
+    x = 30,
+    y = 280,
+    angle = 90,
+    colour = "white",
+    size = ggtext_size,
+    hjust = 1,
+    fontface = "italic",
+    family = "Futura"
+  ) +
+  geom_abline(slope = 1, colour = "grey") +
+  # geom_hline(yintercept = 100, colour = "grey") +
+  # geom_vline(xintercept = 100, colour = "grey") +
+  geom_point(
+    colour = "black",
+    fill = "white",
+    shape = 21,
+    size = 2,
+    # stroke = 0.1
+  ) +
+  # geom_smooth(method = "lm") +
+  labs(
+    x = "Actual [% of WT]",
+    y = "Predicted [% of WT]"
+  ) +
+  # geom_smooth(method = "lm") +
+  scale_fill_manual(values = c(colorspace::desaturate("#275d95", 0.5), colorspace::desaturate("#d25952", 0.5))) +
+  coord_fixed(xlim = c(20,280), ylim = c(20,280), expand = FALSE) +
+  theme_leo() +
+  theme(legend.position = "none") +
+  facet_wrap(~variable)
+
+eval_plot
+# ggsave(
+#   "/home/leonard/Dropbox/Reviewing/post publication review/2023_Sulis/sulis_eval_plot.pdf",
+#   width = 120,
+#   height = 120,
+#   units = "mm"
+# )
+```

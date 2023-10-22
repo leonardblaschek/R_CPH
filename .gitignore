@@ -43,6 +43,8 @@ vignettes/*.pdf
 *.pdf
 *.png
 *.csv
+*.tsv
+*.xlsx
 *.html
 *.gif
 

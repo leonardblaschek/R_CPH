@@ -1,0 +1,16 @@
+.reveal .slide-logo {
+  height: 150px !important;
+  width: 150px !important;
+  max-width: unset !important;
+  max-height: unset !important;
+}
+
+.reveal .highlight {
+    background: #e8c245;
+}
+
+.reveal .half-title {
+  font-family: "Mrs Eaves OT", "Cormorant Garamond", serif;
+  font-weight: bold;
+  font-size: 100px;
+}
