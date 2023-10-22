@@ -164,7 +164,7 @@ kable(dilution,
   )) %>% 
   row_spec(6, bold = T) %>%
   footnote(
-    general = "Finally, add 1 tablet/50 ml and 1\\\\% PVP and stir until dissolved",
+    general = "Finally, add 1 protease inhibitor tablet/50 ml and 1\\\\% PVP; stir until dissolved",
     general_title = "",
     threeparttable = T,
     escape = F
@@ -192,7 +192,7 @@ During the whole extraction process, **work on ice!**
 - Centrifuge at 12 000 rpm and 4°C for 30 min.
 - Carefully split the supernatant into three technical replicates (use the yellow screw-capped, flat-bottomed tubes). You can usually remove 1 ml per technical replicate (3 ml in total) for each gram of sample without any carry-over. Discard the pellet.
     - Keep 100 µl of supernatant from each sample for total protein quantification and/or Western blot QC.
-- Add 16.5 µl of equilibrated anti-FLAG beads per ml of supernatant to each tube.
+- Add 15 µl of equilibrated anti-FLAG beads per ml of supernatant to each tube.
 - Agitate tubes (120 rpm) at 4°C for 2 h.
 - Use the magnetic rack to remove the supernatant -- The FLAG-tagged proteins are now adsorbed to the beads.
     - Keep 30 µl of supernatant per sample (10 µl per replicate, pooled) for Western blot QC, discard the rest.
