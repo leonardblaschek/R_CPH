@@ -27,6 +27,7 @@ library(tidyverse)
 library(ggtext)
 library(ggbeeswarm)
 library(patchwork)
+library(tukeygrps)
 
 ## import Helvetica ####
 font_add(
@@ -44,7 +45,7 @@ text_size <- 6
 theme_leo <- function(base_size = text_size,
                       base_family = "Helvetica") {
                         theme_minimal(
-                          base_size = base_size,
+                          base_size = text_size,
                           base_family = base_family
                         ) %+replace%
                         theme(
@@ -58,13 +59,13 @@ theme_leo <- function(base_size = text_size,
                             color = "black"
                           ),
                           axis.text.x = element_text(
-                            size = base_size,
+                            size = text_size,
                             colour = "black",
                             margin = margin(1, 1, 1, 1)
                           ),
                           axis.text.y = element_text(
                             colour = "black",
-                            size = base_size,
+                            size = text_size,
                             angle = 0,
                             vjust = 0.5,
                             hjust = 1,
@@ -72,7 +73,7 @@ theme_leo <- function(base_size = text_size,
                           ),
                           axis.title = element_text(
                             colour = "black",
-                            size = base_size
+                            size = text_size
                           ),
                           panel.grid.major = element_blank(),
                           panel.grid.minor = element_blank(),
@@ -82,7 +83,7 @@ theme_leo <- function(base_size = text_size,
                           legend.text = element_text(size = rel(0.8)),
                           legend.key.height = unit(4, "mm"),
                           plot.title = element_text(
-                            size = base_size,
+                            size = text_size,
                             hjust = 0
                           ),
                           complete = TRUE
@@ -298,10 +299,21 @@ areas <- bind_rows(Wiesner_areas, CLSM_areas) |>
   pivot_longer(c(area, total_area), names_to = "variable", values_to = "value") |> 
   mutate(variable = case_match(variable,
                                "area" ~ "Lignified repulum area [µm<sup>2</sup>]",
-                               "total_area" ~ "Total silique area [µm<sup>2</sup>]")) |> 
+                               "total_area" ~ "Total silique area [µm<sup>2</sup>]")) |>
   distinct() |> 
-  group_by(method, genotype, daf, replicate, variable) |> 
-  summarise(value = mean(value))
+  group_by(genotype, daf, replicate, variable) |> 
+  summarise(value = mean(value, na.rm = TRUE))
+
+letters <- letter_groups(
+  areas,
+  value,
+  genotype,
+  "tukey",
+  daf,
+  # method,
+  variable,
+  print_position = "above"
+)
 
 area_plot <- ggplot(areas,
                    aes(
@@ -317,7 +329,7 @@ area_plot <- ggplot(areas,
   # ) +
   geom_line(
     stat = "summary",
-    fun = "mean",
+    fun = "median",
     aes(colour = genotype),
     position = position_dodge(width = 0.32),
     linewidth = 0.4
@@ -332,32 +344,41 @@ area_plot <- ggplot(areas,
   #     dodge.width = 0.32,
   #     width = 0.05)
   # ) +
-  geom_errorbar(
-    aes(colour = genotype),
-    stat = "summary",
-    fun.data = "mean_se",
-    position = position_dodge(width = 0.32),
-    width = 0.2,
-    linewidth = 0.4
-  ) +
-  geom_point(
-    stat = "summary",
-    fun = "mean",
-    aes(colour = genotype),
-    shape = 21,
-    fill = "white",
-    stroke = 0.2,
-    size = 1,
-    position = position_dodge(width = 0.32)
-  ) +
+  # geom_errorbar(
+  #   aes(colour = genotype),
+  #   stat = "summary",
+  #   fun.data = "mean_sdl",
+  #   position = position_dodge(width = 0.32),
+  #   width = 0.2,
+  #   linewidth = 0.4
+  # ) +
+  geom_boxplot(
+    aes(colour = genotype, 
+        group = interaction(genotype, daf)),
+    position = position_dodge(width = 0.4),
+    width = 0.4,
+    linewidth = 0.4,
+    fatten = 1,
+    outlier.alpha = 0) +
+  # geom_point(
+  #   stat = "summary",
+  #   fun = "mean",
+  #   aes(colour = genotype),
+  #   shape = 21,
+  #   fill = "white",
+  #   stroke = 0.2,
+  #   size = 1,
+  #   position = position_dodge(width = 0.32)
+  # ) +
   scale_x_continuous(breaks = c(4, 6, 8)) +
   # scale_y_continuous(limits = c(0, NA)) +
-  scale_colour_manual(values = c(pal_ostwald_disc[c(1,3)], colorspace::lighten(pal_ostwald_disc[3], 0.4))) +
+  scale_colour_manual(values = c(pal_ostwald_disc[c(1)], colorspace::lighten(pal_ostwald_disc[3], 0.2), colorspace::darken(pal_ostwald_disc[3], 0.2))) +
   labs(
     x = "DAF",
     y = NULL
   ) +
-  facet_grid(variable ~ method, scale = "free_y", switch = "y") +
+  # facet_grid(variable ~ method, scale = "free_y", switch = "y") +
+  facet_wrap(~variable, scale = "free_y", switch = "y") +
   theme_leo() +
   theme(
     legend.position = c(0.1, 0.9),
@@ -365,7 +386,7 @@ area_plot <- ggplot(areas,
     strip.placement = "outside",
     strip.text.y.left = element_textbox_simple(halign = 0.5, 
                                                orientation = "left-rotated",
-                                               size = base_size),
+                                               size = text_size),
     )
 
 
@@ -374,7 +395,7 @@ area_plot
 ggsave(
   file = "silique_timeline.pdf",
   width = 90,
-  height = 70,
+  height = 50,
   units = "mm"
 )
 ```
