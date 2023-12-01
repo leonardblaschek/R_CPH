@@ -91,7 +91,7 @@ theme_leo <- function(base_size = text_size,
                         }
 
 # convenience figure size functions
-ggtext_size <- 8 / (14 / 5)
+ggtext_size <- text_size / (14 / 5)
 cm_size <- function(x) x / 2.54
 twocol <- 18 / 2.54
 onehalfcol <- 14 / 2.54
@@ -312,7 +312,7 @@ letters <- letter_groups(
   daf,
   # method,
   variable,
-  print_position = "above"
+  # print_position = "below"
 )
 
 area_plot <- ggplot(areas,
@@ -331,7 +331,7 @@ area_plot <- ggplot(areas,
     stat = "summary",
     fun = "median",
     aes(colour = genotype),
-    position = position_dodge(width = 0.32),
+    position = position_dodge(width = 0.4),
     linewidth = 0.4
   ) +
   # geom_point(
@@ -356,8 +356,8 @@ area_plot <- ggplot(areas,
     aes(colour = genotype, 
         group = interaction(genotype, daf)),
     position = position_dodge(width = 0.4),
-    width = 0.4,
-    linewidth = 0.4,
+    width = 0.3,
+    linewidth = 0.3,
     fatten = 1,
     outlier.alpha = 0) +
   # geom_point(
@@ -370,6 +370,13 @@ area_plot <- ggplot(areas,
   #   size = 1,
   #   position = position_dodge(width = 0.32)
   # ) +
+  geom_text(
+    data = letters,
+    aes(label = Letters),
+    family = "Helvetica",
+    size = ggtext_size,
+    position = position_dodge2(width = 0.4)
+    ) +
   scale_x_continuous(breaks = c(4, 6, 8)) +
   # scale_y_continuous(limits = c(0, NA)) +
   scale_colour_manual(values = c(pal_ostwald_disc[c(1)], colorspace::lighten(pal_ostwald_disc[3], 0.2), colorspace::darken(pal_ostwald_disc[3], 0.2))) +
@@ -381,7 +388,7 @@ area_plot <- ggplot(areas,
   facet_wrap(~variable, scale = "free_y", switch = "y") +
   theme_leo() +
   theme(
-    legend.position = c(0.1, 0.9),
+    legend.position = c(0.1, 0.85),
     legend.title = element_blank(),
     strip.placement = "outside",
     strip.text.y.left = element_textbox_simple(halign = 0.5, 
