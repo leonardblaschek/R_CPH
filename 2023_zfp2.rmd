@@ -400,6 +400,83 @@ ggsave(
 )
 ```
 
+## Glucosinolates
+
+```{r}
+gluc_data <- read_tsv("/home/leonard/Dropbox/2022_zfp2/Glucosinolates/chain_length.tsv") |> 
+  select(-`Indole GLS`) |> 
+  pivot_longer(c(3:4), names_to = "metabolite", values_to = "nmol") |> 
+  mutate(Genotype = ordered(
+    Genotype, 
+    levels = c(
+      "Col-0",
+      "<i>zfp2-1</i>",
+      "<i>zfp2-2</i>",
+      "<i>zfp2-3</i>"
+    )))
+
+letters <- letter_groups(
+  gluc_data,
+  nmol,
+  Genotype,
+  "tukey",
+  metabolite,
+  Tissuetype,
+  print_position = "above",
+  print_adjust = 1.5
+) |> 
+  mutate(nmol = case_when(nmol < 0.6 ~ nmol + 0.3,
+                          TRUE ~ nmol))
+
+ggplot(gluc_data,
+       aes(x = Genotype,
+           y = nmol)) +
+  geom_violin(
+    adjust = 1.5,
+    draw_quantiles = 0.5,
+    colour = "black",
+    scale = "width"
+  ) +
+  geom_quasirandom(
+    aes(fill = Genotype),
+    size = 1.2,
+    stroke = 0.2,
+    colour = "white",
+    shape = 21,
+    width = 0.2
+  ) +
+  geom_text(
+    data = letters,
+    aes(label = Letters),
+    size = ggtext_size,
+    family = "Helvetica"
+  ) +
+  labs(y = "Amount [nmol]") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
+  scale_fill_manual(values = c(
+    pal_ostwald_disc[1], 
+    colorspace::lighten(pal_ostwald_disc[3], 0.2), 
+    pal_ostwald_disc[3],
+    colorspace::darken(pal_ostwald_disc[3], 0.2))) +
+  theme_leo() +
+  theme(
+    axis.text.x = element_markdown(),
+    axis.title.x = element_blank()
+  ) +
+  facet_grid(
+    Tissuetype ~ metabolite,
+    scales = "free")
+
+ggsave(
+  "glucs.pdf",
+  width = 110,
+  height = 90,
+  units = "mm"
+)
+
+```
+
+
 
 
 
