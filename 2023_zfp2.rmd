@@ -278,6 +278,38 @@ fun_plot
 dev.off()
 ```
 
+## 2023-11 Funicle eSCW density
+
+```{r}
+
+eSCW <- read_tsv("/home/leonard/Dropbox/2022_zfp2/funiculus_eSCW.tsv") 
+
+eSCW_density <- eSCW |> 
+  mutate(min_total = min(total)) |> 
+  filter(distance < min_total) |> 
+  group_by(genotype, replicate) |> 
+  summarise(
+    n = n(),
+    total = unique(total),
+    min_total = unique(min_total)) |> 
+  mutate(
+    density = (n / min_total) * 2
+    )
+
+ggplot(eSCW_density,
+       aes(x = genotype,
+           y = density)) +
+  geom_point() +
+  labs(
+    x = NULL,
+    y = "Ectopic SCW formation [cells per µm funicle]"
+  ) +
+  theme_leo() +
+  theme(axis.title.y = element_markdown())
+
+```
+
+
 ## 2023-09 Timeline sections
 
 ### Repulum area
