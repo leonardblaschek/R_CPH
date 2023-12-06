@@ -285,21 +285,41 @@ dev.off()
 eSCW <- read_tsv("/home/leonard/Dropbox/2022_zfp2/funiculus_eSCW.tsv") 
 
 eSCW_density <- eSCW |> 
-  mutate(min_total = min(total)) |> 
-  filter(distance < min_total) |> 
+  # mutate(min_total = min(total)) |>
+  # filter(distance < min_total) |>
   group_by(genotype, replicate) |> 
   summarise(
     n = n(),
-    total = unique(total),
-    min_total = unique(min_total)) |> 
+    total = unique(total)
+    ) |> 
   mutate(
-    density = (n / min_total) * 2
+    density = (n / total) * 2
     )
+
+letters <- letter_groups(
+  eSCW_density,
+  density,
+  genotype,
+  "tukey",
+  print_position = "above"
+)
 
 ggplot(eSCW_density,
        aes(x = genotype,
            y = density)) +
-  geom_point() +
+  geom_beeswarm() +
+  # geom_pointrange(
+  #   stat = "summary",
+  #   fun.data = "mean_sdl",
+  #   colour = pal_ostwald_disc[1]
+  # ) +
+  geom_boxplot() +
+  geom_text(
+    data = letters,
+    aes(label = Letters),
+    family = "Helvetica",
+    size = ggtext_size
+  ) +
   labs(
     x = NULL,
     y = "Ectopic SCW formation [cells per µm funicle]"
