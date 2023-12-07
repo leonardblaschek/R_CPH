@@ -44,51 +44,51 @@ text_size <- 6
 
 theme_leo <- function(base_size = text_size,
                       base_family = "Helvetica") {
-                        theme_minimal(
-                          base_size = text_size,
-                          base_family = base_family
-                        ) %+replace%
-                        theme(
-                          strip.text = element_text(
-                            hjust = 0,
-                            # face = "italic"
-                          ),
-                          axis.ticks = element_line(
-                            linewidth = 0.125,
-                            lineend = "square",
-                            color = "black"
-                          ),
-                          axis.text.x = element_text(
-                            size = text_size,
-                            colour = "black",
-                            margin = margin(1, 1, 1, 1)
-                          ),
-                          axis.text.y = element_text(
-                            colour = "black",
-                            size = text_size,
-                            angle = 0,
-                            vjust = 0.5,
-                            hjust = 1,
-                            margin = margin(1, 1, 1, 1)
-                          ),
-                          axis.title = element_text(
-                            colour = "black",
-                            size = text_size
-                          ),
-                          panel.grid.major = element_blank(),
-                          panel.grid.minor = element_blank(),
-                          panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
-                          panel.spacing = unit(1.5, "mm"),
-                          legend.position = "none",
-                          legend.text = element_text(size = rel(0.8)),
-                          legend.key.height = unit(4, "mm"),
-                          plot.title = element_text(
-                            size = text_size,
-                            hjust = 0
-                          ),
-                          complete = TRUE
-                        )
-                        }
+  theme_minimal(
+    base_size = text_size,
+    base_family = base_family
+  ) %+replace%
+    theme(
+      strip.text = element_text(
+        hjust = 0,
+        # face = "italic"
+      ),
+      axis.ticks = element_line(
+        linewidth = 0.125,
+        lineend = "square",
+        color = "black"
+      ),
+      axis.text.x = element_text(
+        size = text_size,
+        colour = "black",
+        margin = margin(1, 1, 1, 1)
+      ),
+      axis.text.y = element_text(
+        colour = "black",
+        size = text_size,
+        angle = 0,
+        vjust = 0.5,
+        hjust = 1,
+        margin = margin(1, 1, 1, 1)
+      ),
+      axis.title = element_text(
+        colour = "black",
+        size = text_size
+      ),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
+      panel.spacing = unit(1.5, "mm"),
+      legend.position = "none",
+      legend.text = element_text(size = rel(0.8)),
+      legend.key.height = unit(4, "mm"),
+      plot.title = element_text(
+        size = text_size,
+        hjust = 0
+      ),
+      complete = TRUE
+    )
+}
 
 # convenience figure size functions
 ggtext_size <- text_size / (14 / 5)
@@ -104,6 +104,11 @@ pal_ostwald_disc <- c(
   "#e8c245",
   "#d25952"
 )
+
+#### machine dependent paths ####
+datapath <- ifelse(dir.exists("/data/2022_KOR1/"), "/data/",
+  "/run/media/leonard/CPH/data/"
+)
 ```
 
 ## 2023-04 Wiesner/AF pilot
@@ -111,167 +116,182 @@ pal_ostwald_disc <- c(
 ```{r}
 ## Load AF
 af_data <- read_tsv("/data/2023_zfp2/Silique_imaging/AF/zfp_AF.tsv") |>
-           group_by(genotype, replicate) |>
-           mutate(relative = value / mean(value[cell_type == "parenchyma"])) |>
-           filter(!(cell_type %in% c("parenchyma", "repulum")))
+  group_by(genotype, replicate) |>
+  mutate(relative = value / mean(value[cell_type == "parenchyma"])) |>
+  filter(!(cell_type %in% c("parenchyma", "repulum")))
 
-af_plot <- ggplot(af_data,
-                  aes(x = genotype,
-                      y = value)) +
-           geom_violin(
-#              aes(fill = genotype),
-             fill = pal_ostwald_disc[1],
-             draw_quantiles = 0.5,
-             # fill = "white",
-             colour = "black",
-             alpha = 0.75,
-             width = 0.5,
-             size = 0.2,
-             scale = "width"
-           ) +
-           geom_quasirandom(
-             shape = 21,
-             fill = "white",
-             colour = "black",
-             stroke = 0.1,
-             alpha = 1,
-             size = 1,
-             width = 0.2
-           ) +
-           stat_summary(
-             aes(
-               group = replicate,
-#                fill = genotype
-             ),
-             fill = "black",
-             colour = "white",
-             shape = 23,
-             stroke = 0.2,
-             fun = "mean",
-             geom = "point",
-             na.rm = TRUE
-           ) +
-           scale_fill_manual(values = pal_ostwald_disc[c(1,3)]) +
-           facet_wrap(~cell_type) +
-           labs(
-             x = "Genotype",
-             y = "Lignin autofluorescence"
-           ) +
-           theme_leo() +
-           theme(axis.title.x = element_blank())
+af_plot <- ggplot(
+  af_data,
+  aes(
+    x = genotype,
+    y = value
+  )
+) +
+  geom_violin(
+    #              aes(fill = genotype),
+    fill = pal_ostwald_disc[1],
+    draw_quantiles = 0.5,
+    # fill = "white",
+    colour = "black",
+    alpha = 0.75,
+    width = 0.5,
+    size = 0.2,
+    scale = "width"
+  ) +
+  geom_quasirandom(
+    shape = 21,
+    fill = "white",
+    colour = "black",
+    stroke = 0.1,
+    alpha = 1,
+    size = 1,
+    width = 0.2
+  ) +
+  stat_summary(
+    aes(
+      group = replicate,
+      #                fill = genotype
+    ),
+    fill = "black",
+    colour = "white",
+    shape = 23,
+    stroke = 0.2,
+    fun = "mean",
+    geom = "point",
+    na.rm = TRUE
+  ) +
+  scale_fill_manual(values = pal_ostwald_disc[c(1, 3)]) +
+  facet_wrap(~cell_type) +
+  labs(
+    x = "Genotype",
+    y = "Lignin autofluorescence"
+  ) +
+  theme_leo() +
+  theme(axis.title.x = element_blank())
 
 ## Load Wiesner
 W_data <- read_tsv("/data/2023_zfp2/Silique_imaging/Wiesner/zfp_Wiesner.tsv") |>
-           filter(!(cell_type %in% c("parenchyma", "repulum")))
+  filter(!(cell_type %in% c("parenchyma", "repulum")))
 
-W_plot <- ggplot(W_data,
-                  aes(x = genotype,
-                      y = absorbance)) +
-          geom_violin(
-#             aes(fill = genotype),
-            fill = pal_ostwald_disc[3],
-            draw_quantiles = 0.5,
-            # fill = "white",
-            colour = "black",
-            alpha = 0.75,
-            width = 0.5,
-            size = 0.2,
-            scale = "width"
-          ) +
-          geom_quasirandom(
-            shape = 21,
-            fill = "white",
-            colour = "black",
-            stroke = 0.1,
-            alpha = 1,
-            size = 1,
-            width = 0.2
-          ) +
-          stat_summary(
-            aes(
-              group = replicate,
-#               fill = genotype
-            ),
-            fill = "black",
-            colour = "white",
-            shape = 23,
-            stroke = 0.2,
-            fun = "mean",
-            geom = "point",
-            na.rm = TRUE
-          ) +
-          scale_fill_manual(values = pal_ostwald_disc[c(1,3)]) +
-          facet_wrap(~cell_type) +
-          labs(
-            x = "Genotype",
-            y = "Wiesner absorbance"
-          ) +
-          theme_leo() +
-          theme(axis.title.x = element_blank())
+W_plot <- ggplot(
+  W_data,
+  aes(
+    x = genotype,
+    y = absorbance
+  )
+) +
+  geom_violin(
+    #             aes(fill = genotype),
+    fill = pal_ostwald_disc[3],
+    draw_quantiles = 0.5,
+    # fill = "white",
+    colour = "black",
+    alpha = 0.75,
+    width = 0.5,
+    size = 0.2,
+    scale = "width"
+  ) +
+  geom_quasirandom(
+    shape = 21,
+    fill = "white",
+    colour = "black",
+    stroke = 0.1,
+    alpha = 1,
+    size = 1,
+    width = 0.2
+  ) +
+  stat_summary(
+    aes(
+      group = replicate,
+      #               fill = genotype
+    ),
+    fill = "black",
+    colour = "white",
+    shape = 23,
+    stroke = 0.2,
+    fun = "mean",
+    geom = "point",
+    na.rm = TRUE
+  ) +
+  scale_fill_manual(values = pal_ostwald_disc[c(1, 3)]) +
+  facet_wrap(~cell_type) +
+  labs(
+    x = "Genotype",
+    y = "Wiesner absorbance"
+  ) +
+  theme_leo() +
+  theme(axis.title.x = element_blank())
 
 pdf("zfp_pilot.pdf", width = onecol, height = onecol)
-W_plot / af_plot & theme(plot.margin = margin(10,1,10,1))
+W_plot / af_plot & theme(plot.margin = margin(10, 1, 10, 1))
 dev.off()
-
 ```
 
 ## 2023-05 Whole mount funicles
 
 ```{r}
 fun_data <- read_tsv("/data/2023_zfp2/Silique_imaging/whole_mount/2023-05_PCW-fluo.csv") |>
-            mutate(genotype = recode(genotype, "zfp2-2" = "<i>zfp2-2</i>")) |>
-            mutate(genotype = ordered(genotype, levels = c("Col-0", "<i>zfp2-2</i>"))) |>
-            mutate(cell_type = ordered(cell_type, levels = c("PCW", "Xylem SCW", "Ectopic SCW"))) |>
-            group_by(date, genotype, replicate) |>
-            mutate(PCW = mean(intensity[cell_type == "PCW"])) |>
-            mutate(relative = intensity / PCW)
+  mutate(genotype = recode(genotype, "zfp2-2" = "<i>zfp2-2</i>")) |>
+  mutate(genotype = ordered(genotype, levels = c("Col-0", "<i>zfp2-2</i>"))) |>
+  mutate(cell_type = ordered(cell_type, levels = c("PCW", "Xylem SCW", "Ectopic SCW"))) |>
+  group_by(date, genotype, replicate) |>
+  mutate(PCW = mean(intensity[cell_type == "PCW"])) |>
+  mutate(relative = intensity / PCW)
 
 fun_avg <- fun_data |>
-           group_by(date, genotype, replicate, cell_type) |>
-           summarise(relative = mean(relative, na.rm = TRUE))
+  group_by(date, genotype, replicate, cell_type) |>
+  summarise(relative = mean(relative, na.rm = TRUE))
 
-fun_plot <- ggplot(fun_data,
-                   aes(x = cell_type,
-                       y = relative,
-                       fill = genotype)) +
-            geom_violin(
-              aes(fill = genotype,
-                  group = interaction(genotype, cell_type)),
-              draw_quantiles = 0.5,
-              colour = "white",
-#               alpha = 0.75,
-#               width = 0.75,
-              linewidth = 0.2,
-              scale = "width",
-              position = position_dodge(width = 0.8)
-            ) +
-            geom_quasirandom(
-              aes(group = genotype),
-              shape = 16,
-              colour = "white",
-              stroke = 0.1,
-              alpha = 1,
-              size = 0.5,
-              width = 0.2,
-              dodge.width = 0.8
-            ) +
-            geom_point(
-              data = fun_avg,
-              colour = "white",
-              shape = 21,
-              stroke = 0.4,
-              position = position_dodge(width = 0.8)
-            ) +
-            scale_fill_manual(values = pal_ostwald_disc[c(1,3)]) +
-            labs(
-              x = "Cell type",
-              y = "Relative lignin fluorescence"
-            ) +
-            theme_leo() +
-            theme(axis.title.x = element_blank(),
-                  legend.position = c(0.1, 0.85),
-                  legend.title = element_blank(),
-                  legend.text = element_markdown())
+fun_plot <- ggplot(
+  fun_data,
+  aes(
+    x = cell_type,
+    y = relative,
+    fill = genotype
+  )
+) +
+  geom_violin(
+    aes(
+      fill = genotype,
+      group = interaction(genotype, cell_type)
+    ),
+    draw_quantiles = 0.5,
+    colour = "white",
+    #               alpha = 0.75,
+    #               width = 0.75,
+    linewidth = 0.2,
+    scale = "width",
+    position = position_dodge(width = 0.8)
+  ) +
+  geom_quasirandom(
+    aes(group = genotype),
+    shape = 16,
+    colour = "white",
+    stroke = 0.1,
+    alpha = 1,
+    size = 0.5,
+    width = 0.2,
+    dodge.width = 0.8
+  ) +
+  geom_point(
+    data = fun_avg,
+    colour = "white",
+    shape = 21,
+    stroke = 0.4,
+    position = position_dodge(width = 0.8)
+  ) +
+  scale_fill_manual(values = pal_ostwald_disc[c(1, 3)]) +
+  labs(
+    x = "Cell type",
+    y = "Relative lignin fluorescence"
+  ) +
+  theme_leo() +
+  theme(
+    axis.title.x = element_blank(),
+    legend.position = c(0.1, 0.85),
+    legend.title = element_blank(),
+    legend.text = element_markdown()
+  )
 
 pdf(paste0("/data/2023_zfp2/", "zfp_funicles.pdf"), width = onecol, height = onecol * 0.4)
 fun_plot
@@ -281,20 +301,25 @@ dev.off()
 ## 2023-11 Funicle eSCW density
 
 ```{r}
+eSCW <- read_tsv("/home/leonard/Dropbox/2022_zfp2/funiculus_eSCW.tsv") |>
+  mutate(genotype = ordered(genotype, levels = c(
+    "Col-0",
+    "<i>zfp2-1</i>",
+    "<i>zfp2-2</i>",
+    "<i>zfp2-3</i>"
+  )))
 
-eSCW <- read_tsv("/home/leonard/Dropbox/2022_zfp2/funiculus_eSCW.tsv") 
-
-eSCW_density <- eSCW |> 
+eSCW_density <- eSCW |>
   # mutate(min_total = min(total)) |>
   # filter(distance < min_total) |>
-  group_by(genotype, replicate) |> 
+  group_by(genotype, replicate) |>
   summarise(
     n = n(),
     total = unique(total)
-    ) |> 
+  ) |>
   mutate(
     density = (n / total) * 2
-    )
+  )
 
 letters <- letter_groups(
   eSCW_density,
@@ -304,16 +329,31 @@ letters <- letter_groups(
   print_position = "above"
 )
 
-ggplot(eSCW_density,
-       aes(x = genotype,
-           y = density)) +
-  geom_beeswarm() +
+ggplot(
+  eSCW_density,
+  aes(
+    x = genotype,
+    y = density
+  )
+) +
+  geom_beeswarm(
+    aes(colour = genotype),
+    shape = 21,
+    fill = "white"
+  ) +
   # geom_pointrange(
   #   stat = "summary",
   #   fun.data = "mean_sdl",
   #   colour = pal_ostwald_disc[1]
   # ) +
-  geom_boxplot() +
+  geom_boxplot(
+    aes(colour = genotype),
+    fill = NA,
+    width = 0.3,
+    linewidth = 0.3,
+    fatten = 1,
+    outlier.alpha = 0
+  ) +
   geom_text(
     data = letters,
     aes(label = Letters),
@@ -322,11 +362,25 @@ ggplot(eSCW_density,
   ) +
   labs(
     x = NULL,
-    y = "Ectopic SCW formation [cells per µm funicle]"
+    y = "Ectopic SCW formation [cells µm<sup>-1</sup>]"
   ) +
+  scale_colour_manual(values = c(
+    pal_ostwald_disc[c(1)],
+    colorspace::lighten(pal_ostwald_disc[3], 0.2),
+    colorspace::darken(pal_ostwald_disc[3], 0.2)
+  )) +
   theme_leo() +
-  theme(axis.title.y = element_markdown())
+  theme(
+    axis.title.y = element_markdown(),
+    axis.text.x = element_markdown()
+  )
 
+ggsave(
+  file = "eSCW.pdf",
+  width = 40,
+  height = 40,
+  units = "mm"
+)
 ```
 
 
@@ -335,25 +389,42 @@ ggplot(eSCW_density,
 ### Repulum area
 
 ```{r}
-
 px_per_micron <- 4.3411
-Wiesner_areas <- read_tsv("/data/2023_zfp2/Silique_imaging/Wiesner/2023-09_Wiesner/repulum_areas.tsv") |> 
+Wiesner_areas <- read_tsv(paste0(datapath, "2023_zfp2/Silique_imaging/Wiesner/2023-09_Wiesner/repulum_areas.tsv")) |>
   mutate(
     area = area / (px_per_micron^2),
     total_area = total_area / (px_per_micron^2),
-    method = "Wiesner stain")
+    method = "Wiesner stain"
+  )
 
-CLSM_areas <- read_tsv("/data/2023_zfp2/Silique_imaging/CW_BF/2023-10_sections/repulum_areas.tsv") |> 
+CLSM_areas <- read_tsv(paste0(datapath, "2023_zfp2/Silique_imaging/CW_BF/2023-10_sections/repulum_areas.tsv")) |>
   mutate(method = "Basic Fuchsin")
 
-areas <- bind_rows(Wiesner_areas, CLSM_areas) |> 
-  select(-mean) |> 
-  pivot_longer(c(area, total_area), names_to = "variable", values_to = "value") |> 
-  mutate(variable = case_match(variable,
-                               "area" ~ "Lignified repulum area [µm<sup>2</sup>]",
-                               "total_area" ~ "Total silique area [µm<sup>2</sup>]")) |>
-  distinct() |> 
-  group_by(genotype, daf, replicate, variable) |> 
+areas <- bind_rows(Wiesner_areas, CLSM_areas) |>
+  select(-mean) |>
+  pivot_longer(c(area, total_area), names_to = "variable", values_to = "value") |>
+  mutate(
+    variable = case_match(
+      variable,
+      "area" ~ "Repulum area [µm<sup>2</sup>]",
+      "total_area" ~ "Silique area [µm<sup>2</sup>]"
+    ),
+    genotype = ordered(
+      case_match(
+        genotype,
+        "Col-0" ~ "Col-0",
+        "zfp2-1" ~ "<i>zfp2-1</i>",
+        "zfp2-2" ~ "<i>zfp2-2</i>"
+      ),
+      levels = c(
+        "Col-0",
+        "<i>zfp2-1</i>",
+        "<i>zfp2-2</i>"
+      )
+    )
+  ) |>
+  distinct() |>
+  group_by(genotype, daf, replicate, variable) |>
   summarise(value = mean(value, na.rm = TRUE))
 
 letters <- letter_groups(
@@ -364,92 +435,159 @@ letters <- letter_groups(
   daf,
   # method,
   variable,
-  # print_position = "below"
-)
+  print_position = "above"
+) |> 
+  mutate(genotype = ordered( genotype, levels = c(
+    levels = c(
+        "Col-0",
+        "<i>zfp2-1</i>",
+        "<i>zfp2-2</i>"
+      )
+  )),
+  value = case_when(daf == 4 & str_detect(variable, "Repulum") ~ value * 2.5,
+                    daf == 4 & !str_detect(variable, "Repulum") ~ value * 1.1,
+                    TRUE ~ value))
 
-area_plot <- ggplot(areas,
-                   aes(
-                     x = daf,
-                     y = value
-                   )) +
-  # geom_violin(
-  #   aes(colour = genotype,
-  #       group = interaction(genotype, daf)),
-  #   position = position_dodge(width = 0.32),
-  #   scale = "width",
-  #   width = 0.3
-  # ) +
-  geom_line(
-    stat = "summary",
-    fun = "median",
-    aes(colour = genotype),
-    position = position_dodge(width = 0.4),
-    linewidth = 0.4
-  ) +
-  # geom_point(
-  #   aes(colour = genotype),
-  #   size = 0.5,
-  #   alpha = 0.5,
-  #   shape = 21,
-  #   fill = "white",
-  #   position = position_quasirandom(
-  #     dodge.width = 0.32,
-  #     width = 0.05)
-  # ) +
-  # geom_errorbar(
-  #   aes(colour = genotype),
+area_plot <- ggplot(
+  areas,
+  aes(
+    x = daf,
+    y = value
+  )
+) +
+  # geom_line(
   #   stat = "summary",
-  #   fun.data = "mean_sdl",
-  #   position = position_dodge(width = 0.32),
-  #   width = 0.2,
+  #   fun = "median",
+  #   aes(colour = genotype),
+  #   position = position_dodge(width = 0.4),
   #   linewidth = 0.4
   # ) +
+  geom_beeswarm(
+    aes(colour = genotype),
+    shape = 21,
+    size = 0.5,
+    fill = "white",
+    dodge.width = 0.4,
+  ) +
   geom_boxplot(
-    aes(colour = genotype, 
-        group = interaction(genotype, daf)),
+    aes(
+      colour = genotype,
+      group = interaction(genotype, daf)
+    ),
     position = position_dodge(width = 0.4),
     width = 0.3,
     linewidth = 0.3,
     fatten = 1,
-    outlier.alpha = 0) +
-  # geom_point(
-  #   stat = "summary",
-  #   fun = "mean",
-  #   aes(colour = genotype),
-  #   shape = 21,
-  #   fill = "white",
-  #   stroke = 0.2,
-  #   size = 1,
-  #   position = position_dodge(width = 0.32)
-  # ) +
+    outlier.alpha = 0,
+    fill = NA
+  ) +
   geom_text(
     data = letters,
-    aes(label = Letters),
+    aes(
+      label = Letters,
+      group = genotype
+      ),
     family = "Helvetica",
     size = ggtext_size,
-    position = position_dodge2(width = 0.4)
-    ) +
+    position = position_dodge(width = 0.4)
+  ) +
   scale_x_continuous(breaks = c(4, 6, 8)) +
   # scale_y_continuous(limits = c(0, NA)) +
-  scale_colour_manual(values = c(pal_ostwald_disc[c(1)], colorspace::lighten(pal_ostwald_disc[3], 0.2), colorspace::darken(pal_ostwald_disc[3], 0.2))) +
+  scale_colour_manual(values = c(
+    pal_ostwald_disc[c(1)],
+    colorspace::lighten(pal_ostwald_disc[3], 0.2),
+    colorspace::darken(pal_ostwald_disc[3], 0.2)
+  )) +
   labs(
     x = "DAF",
     y = NULL
   ) +
   # facet_grid(variable ~ method, scale = "free_y", switch = "y") +
-  facet_wrap(~variable, scale = "free_y", switch = "y") +
+  facet_wrap(~variable, scale = "free_y", switch = "y", nrow = 2) +
   theme_leo() +
   theme(
     legend.position = c(0.1, 0.85),
     legend.title = element_blank(),
+    legend.text = element_markdown(),
     strip.placement = "outside",
-    strip.text.y.left = element_textbox_simple(halign = 0.5, 
-                                               orientation = "left-rotated",
-                                               size = text_size),
-    )
+    strip.text.y.left = element_textbox_simple(
+      halign = 0.5,
+      orientation = "left-rotated",
+      size = text_size
+    ),
+  )
 
+appender <- function(string, suffix = " DAF") paste0(string, suffix)
 
-area_plot
+area_grid <- ggplot(
+  areas,
+  aes(
+    x = genotype,
+    y = value
+  )
+) +
+  # geom_line(
+  #   stat = "summary",
+  #   fun = "median",
+  #   aes(colour = genotype),
+  #   position = position_dodge(width = 0.4),
+  #   linewidth = 0.4
+  # ) +
+  geom_beeswarm(
+    aes(colour = genotype),
+    shape = 21,
+    size = 0.5,
+    fill = "white"
+  ) +
+  geom_boxplot(
+    aes(
+      colour = genotype,
+    ),
+    width = 0.3,
+    linewidth = 0.3,
+    fatten = 1,
+    outlier.alpha = 0,
+    fill = NA
+  ) +
+  geom_text(
+    data = letters,
+    aes(
+      label = Letters,
+      group = genotype
+      ),
+    family = "Helvetica",
+    size = ggtext_size,
+  ) +
+  # scale_y_continuous(limits = c(0, NA)) +
+  scale_colour_manual(values = c(
+    pal_ostwald_disc[c(1)],
+    colorspace::lighten(pal_ostwald_disc[3], 0.2),
+    colorspace::darken(pal_ostwald_disc[3], 0.2)
+  )) +
+  labs(
+    x = NULL,
+    y = NULL
+  ) +
+  facet_grid(
+    variable ~ daf, 
+    scale = "free_y", 
+    switch = "y",
+    labeller = labeller(.cols = as_labeller(appender))) +
+  # facet_wrap(~variable, scale = "free_y", switch = "y", nrow = 2) +
+  theme_leo() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_markdown(),
+    strip.placement = "outside",
+    strip.text.y.left = element_textbox_simple(
+      halign = 0.5,
+      orientation = "left-rotated",
+      size = text_size
+    ),
+  )
+
+area_grid
 
 ggsave(
   file = "silique_timeline.pdf",
@@ -462,17 +600,18 @@ ggsave(
 ## Glucosinolates
 
 ```{r}
-gluc_data <- read_tsv("/home/leonard/Dropbox/2022_zfp2/Glucosinolates/chain_length.tsv") |> 
-  select(-`Indole GLS`) |> 
-  pivot_longer(c(3:4), names_to = "metabolite", values_to = "nmol") |> 
+gluc_data <- read_tsv("/home/leonard/Dropbox/2022_zfp2/Glucosinolates/chain_length.tsv") |>
+  select(-`Indole GLS`) |>
+  pivot_longer(c(3:4), names_to = "metabolite", values_to = "nmol") |>
   mutate(Genotype = ordered(
-    Genotype, 
+    Genotype,
     levels = c(
       "Col-0",
       "<i>zfp2-1</i>",
       "<i>zfp2-2</i>",
       "<i>zfp2-3</i>"
-    )))
+    )
+  ))
 
 letters <- letter_groups(
   gluc_data,
@@ -483,13 +622,19 @@ letters <- letter_groups(
   Tissuetype,
   print_position = "above",
   print_adjust = 1.5
-) |> 
-  mutate(nmol = case_when(nmol < 0.6 ~ nmol + 0.3,
-                          TRUE ~ nmol))
+) |>
+  mutate(nmol = case_when(
+    nmol < 0.6 ~ nmol + 0.3,
+    TRUE ~ nmol
+  ))
 
-ggplot(gluc_data,
-       aes(x = Genotype,
-           y = nmol)) +
+ggplot(
+  gluc_data,
+  aes(
+    x = Genotype,
+    y = nmol
+  )
+) +
   geom_violin(
     adjust = 1.5,
     draw_quantiles = 0.5,
@@ -513,10 +658,11 @@ ggplot(gluc_data,
   labs(y = "Amount [nmol]") +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
   scale_fill_manual(values = c(
-    pal_ostwald_disc[1], 
-    colorspace::lighten(pal_ostwald_disc[3], 0.2), 
+    pal_ostwald_disc[1],
+    colorspace::lighten(pal_ostwald_disc[3], 0.2),
     pal_ostwald_disc[3],
-    colorspace::darken(pal_ostwald_disc[3], 0.2))) +
+    colorspace::darken(pal_ostwald_disc[3], 0.2)
+  )) +
   theme_leo() +
   theme(
     axis.text.x = element_markdown(),
@@ -524,7 +670,8 @@ ggplot(gluc_data,
   ) +
   facet_grid(
     Tissuetype ~ metabolite,
-    scales = "free")
+    scales = "free"
+  )
 
 ggsave(
   "glucs.pdf",
@@ -532,36 +679,4 @@ ggsave(
   height = 90,
   units = "mm"
 )
-
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
