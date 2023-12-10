@@ -298,7 +298,9 @@ fun_plot
 dev.off()
 ```
 
-## 2023-11 Funicle eSCW density
+## 2023-11 Funicle eSCW
+
+### Density
 
 ```{r}
 eSCW <- read_tsv("/home/leonard/Dropbox/2022_zfp2/funiculus_eSCW.tsv") |>
@@ -338,6 +340,7 @@ ggplot(
 ) +
   geom_beeswarm(
     aes(colour = genotype),
+    size = 1,
     shape = 21,
     fill = "white"
   ) +
@@ -350,7 +353,7 @@ ggplot(
     aes(colour = genotype),
     fill = NA,
     width = 0.3,
-    linewidth = 0.3,
+    linewidth = 0.4,
     fatten = 1,
     outlier.alpha = 0
   ) +
@@ -365,9 +368,10 @@ ggplot(
     y = "Ectopic SCW formation [cells µm<sup>-1</sup>]"
   ) +
   scale_colour_manual(values = c(
-    pal_ostwald_disc[c(1)],
-    colorspace::lighten(pal_ostwald_disc[3], 0.2),
-    colorspace::darken(pal_ostwald_disc[3], 0.2)
+    pal_ostwald_disc[1],
+    colorspace::lighten(pal_ostwald_disc[3], 0.4, space = "HCL"),
+    pal_ostwald_disc[3],
+    colorspace::darken(pal_ostwald_disc[3], 0.2, space = "combined")
   )) +
   theme_leo() +
   theme(
@@ -382,6 +386,111 @@ ggsave(
   units = "mm"
 )
 ```
+
+### Cell length
+
+```{r}
+cell_files <-
+  list.files(
+    path = paste0(
+      datapath, 
+      "2023_zfp2/Silique_imaging/whole_mount/2023-11_SP5X/plantseg/PreProcessing/generic_confocal_3D_unet/GASP/PostProcessing/MorpholibJ_output/"),
+    pattern = "*.csv",
+    recursive = FALSE,
+    full.names = TRUE
+  )
+
+read_plus <- function(flnm) {
+  read_csv(flnm) |> 
+    mutate(filename = basename(flnm)) |> 
+    select(-c(1, 2)) |>
+    separate(filename, into = c("genotype", "daf", "replicate", "model"), sep = "_", extra = "merge")
+}
+
+cell_data <- map_dfr(cell_files, read_plus) |> 
+  mutate(
+    diameter = `EllMajRad(Unit)` * 2,
+    genotype = case_when(genotype == "Col-0" ~ genotype,
+                         TRUE ~ paste0("<i>", genotype, "</i>")),
+    genotype = ordered(genotype, levels = c(
+      "Col-0",
+      "<i>zfp2-1</i>",
+      "<i>zfp2-2</i>",
+      "<i>zfp2-3</i>"
+    ))
+    )
+
+cell_data_avg <- cell_data |> 
+  group_by(genotype, daf, replicate) |> 
+  summarise(
+    diameter = median(diameter),
+    n = n())
+
+letters <- letter_groups(
+  cell_data_avg,
+  diameter,
+  genotype,
+  "tukey",
+  print_position = 8
+)
+
+ggplot(cell_data,
+       aes(x = genotype,
+           y = diameter)) +
+  geom_violin(
+    # aes(colour = genotype),
+    colour = "white",
+    fill = "grey85",
+    linewidth = 0.4,
+  ) +
+  geom_beeswarm(
+    aes(
+      colour = genotype,
+      group = interaction(genotype, replicate)
+      ),
+    size = 1,
+    stat = "summary",
+    fun = "median",
+    shape = 21,
+    fill = "white"
+  ) +
+  geom_boxplot(
+    data = cell_data_avg,
+    aes(colour = genotype),
+    fill = NA,
+    width = 0.3,
+    linewidth = 0.4,
+    fatten = 1,
+    outlier.alpha = 0
+  ) +
+  geom_text(
+    data = letters,
+    aes(label = Letters),
+    family = "Helvetica",
+    size = ggtext_size
+  ) +
+  labs(
+    x = NULL,
+    y = "Cortex cell length [µm]"
+  ) +
+  coord_cartesian(ylim = c(5, 35)) +
+  scale_colour_manual(values = c(
+    pal_ostwald_disc[1],
+    colorspace::lighten(pal_ostwald_disc[3], 0.4, space = "HCL"),
+    pal_ostwald_disc[3],
+    colorspace::darken(pal_ostwald_disc[3], 0.2, space = "combined")
+  )) +
+  theme_leo() +
+  theme(axis.text.x = element_markdown())
+  
+  ggsave(
+  file = "cell_length.pdf",
+  width = 40,
+  height = 40,
+  units = "mm"
+)
+```
+
 
 
 ## 2023-09 Timeline sections
@@ -423,12 +532,15 @@ areas <- bind_rows(Wiesner_areas, CLSM_areas) |>
       )
     )
   ) |>
-  distinct() |>
+  distinct() 
+
+
+areas_avg <- areas |>
   group_by(genotype, daf, replicate, variable) |>
   summarise(value = mean(value, na.rm = TRUE))
 
 letters <- letter_groups(
-  areas,
+  areas_avg,
   value,
   genotype,
   "tukey",
@@ -449,23 +561,22 @@ letters <- letter_groups(
                     TRUE ~ value))
 
 area_plot <- ggplot(
-  areas,
+  areas_avg,
   aes(
     x = daf,
     y = value
   )
 ) +
-  # geom_line(
-  #   stat = "summary",
-  #   fun = "median",
-  #   aes(colour = genotype),
-  #   position = position_dodge(width = 0.4),
-  #   linewidth = 0.4
+  # geom_violin(
+  #   data = areas,
+  #   colour = "white",
+  #   fill = "grey85",
+  #   linewidth = 0.4,
   # ) +
   geom_beeswarm(
     aes(colour = genotype),
     shape = 21,
-    size = 0.5,
+    size = 1,
     fill = "white",
     dodge.width = 0.4,
   ) +
@@ -476,7 +587,7 @@ area_plot <- ggplot(
     ),
     position = position_dodge(width = 0.4),
     width = 0.3,
-    linewidth = 0.3,
+    linewidth = 0.4,
     fatten = 1,
     outlier.alpha = 0,
     fill = NA
@@ -520,18 +631,17 @@ area_plot <- ggplot(
 appender <- function(string, suffix = " DAF") paste0(string, suffix)
 
 area_grid <- ggplot(
-  areas,
+  areas_avg,
   aes(
     x = genotype,
     y = value
   )
 ) +
-  # geom_line(
-  #   stat = "summary",
-  #   fun = "median",
-  #   aes(colour = genotype),
-  #   position = position_dodge(width = 0.4),
-  #   linewidth = 0.4
+  # geom_violin(
+  #   data = areas,
+  #   colour = "white",
+  #   fill = "grey85",
+  #   linewidth = 0.4,
   # ) +
   geom_beeswarm(
     aes(colour = genotype),
@@ -602,6 +712,8 @@ ggsave(
 ```{r}
 gluc_data <- read_tsv("/home/leonard/Dropbox/2022_zfp2/Glucosinolates/chain_length.tsv") |>
   select(-`Indole GLS`) |>
+  mutate(Tissuetype = case_when(str_detect(Tissuetype, "septum") ~ "Silique without seeds",
+                                TRUE ~ Tissuetype)) |> 
   pivot_longer(c(3:4), names_to = "metabolite", values_to = "nmol") |>
   mutate(Genotype = ordered(
     Genotype,
@@ -635,19 +747,24 @@ ggplot(
     y = nmol
   )
 ) +
-  geom_violin(
-    adjust = 1.5,
-    draw_quantiles = 0.5,
-    colour = "black",
-    scale = "width"
-  ) +
-  geom_quasirandom(
-    aes(fill = Genotype),
-    size = 1.2,
-    stroke = 0.2,
-    colour = "white",
+  geom_beeswarm(
+    aes(colour = Genotype),
+    size = 1,
     shape = 21,
-    width = 0.2
+    fill = "white"
+  ) +
+  # geom_pointrange(
+  #   stat = "summary",
+  #   fun.data = "mean_sdl",
+  #   colour = pal_ostwald_disc[1]
+  # ) +
+  geom_boxplot(
+    aes(colour = Genotype),
+    fill = NA,
+    width = 0.3,
+    linewidth = 0.4,
+    fatten = 1,
+    outlier.alpha = 0
   ) +
   geom_text(
     data = letters,
@@ -657,11 +774,11 @@ ggplot(
   ) +
   labs(y = "Amount [nmol]") +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
-  scale_fill_manual(values = c(
+  scale_colour_manual(values = c(
     pal_ostwald_disc[1],
-    colorspace::lighten(pal_ostwald_disc[3], 0.2),
+    colorspace::lighten(pal_ostwald_disc[3], 0.4, space = "HCL"),
     pal_ostwald_disc[3],
-    colorspace::darken(pal_ostwald_disc[3], 0.2)
+    colorspace::darken(pal_ostwald_disc[3], 0.2, space = "combined")
   )) +
   theme_leo() +
   theme(
