@@ -1,0 +1,254 @@
+---
+title: "Hexokinase phosphorylation"
+author: "Leonard Blaschek"
+format: 
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  message: false
+  warning: false
+---
+
+```{r}
+library(tidyverse)
+library(ggtext)
+library(gt)
+library(showtext)
+library(tukeygrps)
+
+showtext_opts(dpi = 400)
+
+font_add(
+  "Futura",
+  regular = "FuturaStd-Medium.otf",
+  italic = "FuturaStd-MediumOblique.otf",
+  bold = "FuturaStd-Bold.otf",
+  bolditalic = "FuturaStd-BoldOblique.otf"
+)
+showtext_auto()
+
+text_size <- 6
+ggtext_size <- text_size / (14 / 5)
+
+#### generating plot theme ####
+theme_leo <- function(base_size = text_size,
+                      base_family = "Futura") {
+  theme_minimal(
+    base_size = base_size,
+    base_family = base_family
+  ) %+replace%
+    theme(
+      strip.text = element_text(hjust = 0, face = "italic"),
+      axis.ticks = element_blank(),
+      axis.text.x = element_text(
+        colour = "black",
+        margin = margin(1, 1, 1, 1),
+        size = text_size
+      ),
+      axis.text.y = element_text(
+        colour = "black",
+        angle = 0,
+        vjust = 0.5,
+        hjust = 1,
+        margin = margin(1, 1, 1, 1),
+        size = text_size
+      ),
+      # axis.title = element_blank(),
+      axis.line = element_line(
+        linewidth = 0.4,
+        colour = "black",
+        lineend = "square"
+      ),
+      plot.title = element_text(size = text_size, hjust = 0),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.spacing = unit(1.5, "mm"),
+      legend.position = "bottom",
+      legend.text = element_text(size = rel(0.8)),
+      legend.key.height = unit(4, "mm"),
+      complete = TRUE
+    )
+}
+
+pal_ostwald_disc <- c(
+  "#275d95",
+  "#e8c245",
+  "#d25952"
+)
+```
+
+# Note of caution
+
+All presented values are the raw intensity of phosphorylated sites. 
+Any increase can also simply reflect an increase in total protein at stable proportions of phosphorylation. 
+An exact ratio of phosphorylated to unphosphorylated protein is hard to do here because of the FLAG/TiO enrichment steps.
+If that seems crucial to you, we can try it nonetheless.
+
+# R1407
+
+## Load DIA-NN data
+
+```{r}
+manifest <- read_tsv(
+  "/home/leonard/Dropbox/PUP-IT_blast/Delphine/2024/HXK_phospho/R1407/1407_TiO.fp-manifest",
+  col_names = c("path", "sample", "replicate", "type"),
+  show_col_types = FALSE
+)
+
+seqs <- read_tsv(
+  "/home/leonard/Dropbox/PUP-IT_blast/Delphine/2024/HXK_phospho/R1407/HXK.tsv",
+  col_names = c("Genes", "sequence"),
+  show_col_types = FALSE
+)
+
+# ptm <- read_csv(
+#   "/home/leonard/Dropbox/PUP-IT_blast/Delphine/2024/HXK_phospho/R1407/msstats_ptm.csv",
+#   show_col_types = FALSE
+# ) |>
+#   filter(ProteinName %in% c("Q42525", "P93834", "Q9LPS1")) |>
+#   filter(!is.na(`STY:79.96633`))
+
+pr_report <- read_tsv(
+  "/home/leonard/Dropbox/PUP-IT_blast/Delphine/2024/HXK_phospho/R1407/report.pr_matrix.tsv",
+  show_col_types = FALSE
+) |> 
+  filter(!is.na(`STY:79.96633`)) |>
+  filter(`STY:79.96633 Best Localization` > 0.8) |> 
+  pivot_longer(starts_with("/data/"), names_to = "path", values_to = "intensity") |>
+  left_join(manifest) |>
+  separate_wider_delim(
+    sample,
+    delim = "_",
+    names = c("species", "construct", "bait", "treatment", "time")
+  ) |>
+  filter(bait != "GFP") |>
+  mutate(time = ordered(time, levels = c("T0", "T8", "T16")))
+  
+n_sites <- pr_report |> 
+  pull(Modified.Sequence) |> 
+  unique() |> 
+  length()
+
+ggplot(
+  pr_report,
+  aes(y = log10(intensity), x = time)
+) +
+  geom_violin(
+    fill = NA
+  ) +
+  geom_boxplot(
+    colour = "black",
+    width = 0.2,
+    fatten = 1,
+    outliers = FALSE
+  ) +
+  labs(
+    title = paste("Distribution of", n_sites, "high-confidendence phosphosites"),
+    y = "Log~10~(intensity)"
+  ) +
+  theme_leo() +
+  theme(
+    axis.title.y = element_markdown(),
+    axis.title.x = element_blank(),
+    plot.title = element_text(size = text_size * 1.5)
+    )
+```
+
+## Summary of high-confidence HXK phosphosites
+
+```{r}
+
+hxk_report <- pr_report |> 
+  filter(Protein.Group %in% c("Q42525", "P93834", "Q9LPS1")) |>
+  left_join(seqs) |>
+  mutate("preceding" = nchar(str_extract(sequence, paste0("([:alpha:]+)", Stripped.Sequence), group = 1)))
+
+hxk_summary <- hxk_report |>
+  mutate(
+    Sequence = paste0(
+      "~",
+      preceding + 1,
+      "~",
+      str_remove(
+        str_replace(
+          Modified.Sequence,
+          "([:alpha:])\\(UniMod:21\\)",
+          "**\\1**"
+        ),
+        "\\(UniMod:4\\)|\\(UniMod:35\\)"
+      ),
+      "~",
+      preceding + nchar(Stripped.Sequence),
+      "~"
+    )
+  ) |>
+  group_by(Genes, Sequence) |>
+  filter(bait == Genes) |>
+  summarise(
+    "Maximum treatment response" = max(intensity, na.rm = TRUE) - min(intensity, na.rm = TRUE)
+  ) |>
+  arrange(desc(`Maximum treatment response`))
+
+gt(
+  hxk_summary,
+  row_group_as_column = TRUE
+) |>
+  fmt_markdown() |>
+  fmt_number(
+    columns = 3,
+    decimals = 0
+  ) |> 
+  cols_width(
+    Sequence ~ pct(60)
+  ) |> 
+  tab_footnote(
+    footnote = "Maximum difference in intensity between time-points; serves as an approximation of sensitivity to the treatment.",
+    locations = cells_column_labels(columns = `Maximum treatment response`)
+  )
+```
+
+
+## Plot sites around position 180
+
+```{r}
+focus_sites <- hxk_report |>
+  filter(str_detect(Stripped.Sequence, "SLSSG") | str_detect(Modified.Sequence, "ELGFTFS\\(")) |>
+  mutate(
+    "Site" = case_when(
+      str_detect(Modified.Sequence, "ELGFTFS\\(") ~ "p177",
+      str_detect(Modified.Sequence, "[:alpha:]{8}\\(") ~ "p189",
+      str_detect(Modified.Sequence, "[:alpha:]{6}\\(") ~ "p187",
+      str_detect(Modified.Sequence, "[:alpha:]{5}\\(") ~ "p186",
+      str_detect(Modified.Sequence, "[:alpha:]{3}\\(") ~ "p184",
+      TRUE ~ NA
+    ),
+    bait = paste(bait, "bait")
+  )
+
+ggplot(
+  focus_sites,
+  aes(x = time, y = intensity, fill = Genes)
+) +
+  stat_summary(
+    aes(group = Genes, colour = Genes),
+    geom = "line",
+    fun = "mean"
+  ) +
+  geom_point(
+    shape = 21,
+    stroke = 0.2,
+    colour = "white"
+  ) +
+  facet_grid(bait ~ Site) +
+  scale_colour_manual(
+    values = pal_ostwald_disc[c(1, 3)],
+    aesthetics = c("colour", "fill"),
+    name = "Protein"
+  ) +
+  labs(
+    y = "Intensity"
+  ) + 
+  theme_leo() +
+  theme(axis.title.x = element_blank())
+```
