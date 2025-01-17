@@ -20,6 +20,7 @@ library(showtext)
 library(tidyverse)
 library(ggbeeswarm)
 library(ggtext)
+library(gt)
 library(patchwork)
 library(tukeygrps)
 library(seqinr)
@@ -130,7 +131,7 @@ pal_ostwald_disc_long <- c(
 )
 
 #### machine dependent paths ####
-datapath <- ifelse(dir.exists("/data/"), "/data/", "/run/media/leonard/CPH/data/")
+datapath <- ifelse(dir.exists("/data/2022_CRISPR_screen/"), "/data/", "/run/media/leonard/CPH/data/")
 
 out_path <- paste0(datapath, "2022_CRISPR_screen/phenotyping/")
 ```
@@ -774,7 +775,7 @@ lines <- full_join(sig_root, sig_hyp) |>
   full_join(stem) |>
   separate(line, into = c("line", "T2 line"), sep = "-")
 
-sgRNAs <- read_tsv("/home/leonard/Documents/Latex/2022_labbook/PKR_line_table.tsv") |>
+sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR_line_table.tsv") |>
   drop_na(Targets) |>
   mutate(Line = as.character(Line)) |>
   mutate(targets = str_extract_all(Targets, "[:alnum:]+")) |>
@@ -876,3 +877,70 @@ kable(
   column_spec(1:10, border_left = "1px solid white") |>
   row_spec(1:nrow(table), extra_css = "border-bottom: 1px solid white")
 ```
+
+## 2024 table
+
+### data
+
+```{r}
+total <- table |> 
+  summarise(
+    `Abberant phenotype (T1)` = n(),
+    Sterile = sum(Ster. != ""),
+    Stem = sum(Stem != ""),
+    Hypocotyl = sum(Hyp. != ""),
+    Root= sum(Root != ""),
+  ) |> 
+  mutate(group = "Total", .before = 1)
+
+seq <- table |> 
+  filter(targets != "") |> 
+  summarise(
+    `Abberant phenotype (T1)` = n(),
+    Sterile = sum(Ster. != ""),
+    Stem = sum(Stem != ""),
+    Hypocotyl = sum(Hyp. != ""),
+    Root= sum(Root != ""),
+  )|> 
+  mutate(group = "Sequenced", .before = 1)
+
+new <- table |> 
+  filter(`Published phenotype` == "none") |> 
+  summarise(
+    `Abberant phenotype (T1)` = n(),
+    Sterile = sum(Ster. != ""),
+    Stem = sum(Stem != ""),
+    Hypocotyl = sum(Hyp. != ""),
+    Root= sum(Root != ""),
+  ) |> 
+  mutate(group = "Completely unknown function", .before = 1)
+
+published <- table |> 
+  filter(`Published phenotype` != "none" & `Published phenotype` != "") |> 
+  summarise(
+    `Abberant phenotype (T1)` = n(),
+    Sterile = sum(Ster. != ""),
+    Stem = sum(Stem != ""),
+    Hypocotyl = sum(Hyp. != ""),
+    Root = sum(Root != ""),
+  ) |> 
+  mutate(group = "Partial phenotype published", .before = 1)
+
+sum_tab <- bind_rows(total, seq, new, published)
+```
+
+### table
+
+```{r}
+sum_gt <- sum_tab |> 
+  gt(rowname_col = "group") |> 
+  tab_spanner("Abberant phenotype (T2)", columns = 3:6) |> 
+  tab_stub_indent(2, indent = 2) |> 
+  tab_stub_indent(3:4, indent = 4) |> 
+  tab_caption("Table 1: Preliminary screening yielded 747 transformants, of which 62 lines had severe T1 phenotypes.")
+
+sum_gt |> 
+  gtsave("table1.html")
+```
+
+
