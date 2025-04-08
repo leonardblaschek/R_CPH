@@ -9,7 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(knitr)
 library(kableExtra)
-library(ggthemes)
 library(showtext)
 library(gganimate)
 library(scales)
@@ -28,11 +27,19 @@ font_add(
   bold = "/OFL_fonts/IBMPlexSans-SemiBold.otf",
   bolditalic = "/OFL_fonts/IBMPlexSans-SemiBoldItalic.otf"
 )
+font_add(
+  "Futura",
+  regular = "FuturaStd-Medium.otf",
+  italic = "FuturaStd-MediumOblique.otf",
+  bold = "FuturaStd-Bold.otf",
+  bolditalic = "FuturaStd-BoldOblique.otf"
+)
 showtext_auto()
+showtext_opts(dpi = 300)
 
 #### generating plot theme ####
-theme_leo <- function(base_size = 11,
-                      base_family = "IBMPlexSans") {
+theme_leo <- function(base_size = 6,
+                      base_family = "Futura") {
   theme_minimal(
     base_size = base_size,
     base_family = base_family
@@ -67,7 +74,7 @@ theme_leo <- function(base_size = 11,
     )
 }
 
-ggtext_size <- 10 / (14 / 5)
+ggtext_size <- 6 / (14 / 5)
 ```
 
 # Path until now
@@ -79,11 +86,11 @@ world <- ne_countries(scale = "medium", returnclass = "sf", continent = "europe"
 
 POIs <- tribble(
   ~lat, ~lon, ~name, ~relevance,
-  54.083333, 13.383333, "Greifswald", "black",
-  59.329444, 18.068611, "Stockholm", "black",
-  59.858056, 17.644722, "Uppsala", "black",
-  52.52, 13.405, "Berlin", "grey50",
   52.770490, 11.877250, "Rohrbeck", "grey50",
+  52.52, 13.405, "Berlin", "grey50",
+  54.083333, 13.383333, "Greifswald", "black",
+  59.858056, 17.644722, "Uppsala", "black",
+  59.329444, 18.068611, "Stockholm", "black",
   55.676111, 12.568333, "Copenhagen", "black"
 )
 ```
@@ -95,19 +102,39 @@ map <- ggplot() +
   geom_sf(
     data = world,
     colour = "white",
-    fill = "darkseagreen",
+    fill = "#275d95",
     size = 0.5
   ) +
-  coord_sf(xlim = c(-11, 31), ylim = c(44, 71), expand = FALSE) +
+  coord_sf(xlim = c(-8, 28), ylim = c(50, 71), expand = FALSE) +
   geom_point(
     data = POIs,
     aes(
       x = lon,
       y = lat,
-      colour = relevance
+      fill = relevance
     ),
-    size = 2,
+    colour = "black",
+    shape = 21,
+    size = 4,
+    stroke = 1,
     inherit.aes = FALSE
+  ) +
+  geom_label(
+    data = POIs[1, ],
+    aes(
+      x = lon,
+      y = lat,
+      label = name
+    ),
+    nudge_x = -1,
+    hjust = 1,
+    family = "Futura",
+    size = ggtext_size,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5),
+    # fill = NA,
+    colour = "black"
   ) +
   annotate("curve", # Rohrbeck -> Berlin
     colour = "#e8c245",
@@ -123,6 +150,23 @@ map <- ggplot() +
       length = unit(1.5, "mm")
     )
   ) +
+  geom_label(
+    data = POIs[2, ],
+    aes(
+      x = lon,
+      y = lat,
+      label = name
+    ),
+    nudge_x = 1,
+    hjust = 0,
+    family = "Futura",
+    size = ggtext_size,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5),
+    # fill = NA,
+    colour = "black"
+  ) +
   annotate("curve", # Berlin -> Greifswald
     colour = "#e8c245",
     size = 1.5,
@@ -136,6 +180,23 @@ map <- ggplot() +
       type = "closed",
       length = unit(1.5, "mm")
     )
+  ) +
+  geom_label(
+    data = POIs[3, ],
+    aes(
+      x = lon,
+      y = lat,
+      label = name
+    ),
+    nudge_x = -1,
+    hjust = 1,
+    family = "Futura",
+    size = ggtext_size,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5),
+    # fill = NA,
+    colour = "black"
   ) +
   annotate("curve", # Greifswald -> Uppsala
     colour = "#e8c245",
@@ -151,6 +212,23 @@ map <- ggplot() +
       length = unit(1.5, "mm")
     )
   ) +
+  geom_label(
+    data = POIs[4, ],
+    aes(
+      x = lon,
+      y = lat,
+      label = name
+    ),
+    nudge_x = -1,
+    hjust = 1,
+    family = "Futura",
+    size = ggtext_size,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5),
+    # fill = NA,
+    colour = "black"
+  ) +
   annotate("curve", # Uppsala -> Stockholm
     colour = "#e8c245",
     size = 1.5,
@@ -164,6 +242,23 @@ map <- ggplot() +
       type = "closed",
       length = unit(1.5, "mm")
     )
+  ) +
+  geom_label(
+    data = POIs[5, ],
+    aes(
+      x = lon,
+      y = lat,
+      label = name
+    ),
+    nudge_x = 1,
+    hjust = 0,
+    family = "Futura",
+    size = ggtext_size,
+    label.size = NA,
+    label.r = (unit(0, "mm")),
+    fill = rgb(1, 1, 1, 0.5),
+    # fill = NA,
+    colour = "black"
   ) +
   annotate("curve", # Stockholm -> Copenhagen
     colour = "#e8c245",
@@ -179,30 +274,52 @@ map <- ggplot() +
       length = unit(1.5, "mm")
     )
   ) +
-  geom_label_repel(
-    data = POIs,
+  geom_label(
+    data = POIs[6, ],
     aes(
       x = lon,
       y = lat,
-      label = name,
-      colour = relevance
+      label = name
     ),
-    seed = 948,
-    family = "IBMPlexSans",
+    nudge_x = -1,
+    hjust = 1,
+    family = "Futura",
+    fontface = 2,
     size = ggtext_size,
-    min.segment.length = 2,
     label.size = NA,
     label.r = (unit(0, "mm")),
-    fill = rgb(1, 1, 1, 0.5)
+    fill = rgb(1, 1, 1, 0.5),
+    # fill = NA,
+    colour = "black"
   ) +
-  scale_colour_manual(values = c("black", "grey50")) +
+  # geom_label_repel(
+  #   data = POIs,
+  #   aes(
+  #     x = lon,
+  #     y = lat,
+  #     label = name,
+  #     colour = relevance
+  #   ),
+  #   seed = 948,
+  #   family = "Futura",
+  #   size = ggtext_size,
+  #   min.segment.length = 2,
+  #   label.size = NA,
+  #   label.r = (unit(0, "mm")),
+  #   fill = rgb(1, 1, 1, 0.5),
+  #   # fill = NA,
+  #   colour = "black"
+  # ) +
+  scale_fill_manual(values = c("white", "grey50")) +
   theme_leo() +
   theme(
-    panel.background = element_rect(fill = "lightblue", colour = NA),
+    panel.background = element_rect(fill = "white", colour = NA),
     legend.position = "none",
-    plot.background = element_rect(fill = "#fff9f5ff", colour = NA)
+    axis.text = element_blank(),
+    axis.title = element_blank()
+    # plot.background = element_rect(fill = "#fff9f5ff", colour = NA)
   ) +
-  transition_layers(layer_order = c(1, 2, 8, 3:7)) +
+  transition_layers(layer_order = c(1, 2, 3:13)) +
   enter_grow()
 
 # pdf("europe.pdf", height = 5)
@@ -210,13 +327,14 @@ map <- ggplot() +
 # dev.off()
 
 animate(
-  map, 
-  units = "px", 
+  map,
+  units = "px",
   width = 618,
-  height = 720, 
-  nframes = 200, 
+  height = 720,
+  nframes = 200,
+  fps = 25,
   renderer = gifski_renderer(loop = FALSE)
-  )
+)
 
 anim_save("europe.gif")
 ```
@@ -327,9 +445,9 @@ map <- ggplot() +
     lineend = "butt",
     curvature = 0.2,
     x = 12.1,
-    y = 55.2, 
+    y = 55.2,
     xend = 7.85,
-    yend = 48.5, 
+    yend = 48.5,
     arrow = arrow(
       type = "closed",
       length = unit(2, "mm"),
