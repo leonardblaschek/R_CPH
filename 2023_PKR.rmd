@@ -16,6 +16,7 @@ output:
 knitr::opts_chunk$set(
   warning = FALSE, message = FALSE
 )
+library(ontologyIndex)
 library(showtext)
 library(tidyverse)
 library(ggbeeswarm)
@@ -24,18 +25,19 @@ library(gt)
 library(patchwork)
 library(tukeygrps)
 library(seqinr)
-library(biomartr)
-library(metablastr)
-library(reticulate)
+# library(biomartr)
+# library(metablastr)
+# library(reticulate)
 library(kableExtra)
-if (dir.exists("/data/")) {
-  use_python("/home/leonard/Applications/miniconda3/envs/blast/bin/python") # office
-} else {
-  use_python("/home/leonard/Applications/mambaforge/envs/blast/bin/python") # laptop
-}
-reticulate::py_config()
+# if (dir.exists("/data/")) {
+#   use_python("/home/leonard/Applications/miniconda3/envs/blast/bin/python") # office
+# } else {
+#   use_python("/home/leonard/Applications/mambaforge/envs/blast/bin/python") # laptop
+# }
+# reticulate::py_config()
 options(timeout = 30000)
 options(knitr.kable.NA = "")
+showtext_opts(dpi = 300)
 
 ## import Helvetica ####
 # font_add(
@@ -59,51 +61,62 @@ font_add(
 showtext_auto()
 
 #### generating plot theme ####
-theme_leo <- function(base_size = 8,
-                      base_family = "Helvetica") {
+font_add(
+  "Futura",
+  regular = "FuturaStd-Medium.otf",
+  italic = "FuturaStd-MediumOblique.otf",
+  bold = "FuturaStd-Bold.otf",
+  bolditalic = "FuturaStd-BoldOblique.otf"
+)
+showtext_auto()
+
+pal_ostwald_disc <- c(
+  "#275d95",
+  "#e8c245",
+  "#d25952",
+  "#7ab6c4"
+)
+
+blues <- c(
+  pal_ostwald_disc[1],
+  colorspace::lighten(pal_ostwald_disc[1], 0.4),
+  colorspace::lighten(pal_ostwald_disc[1], 0.7)
+)
+
+text_size <- 9
+ggtext_size <- text_size / (14 / 5)
+
+#### generating plot theme ####
+theme_leo <- function(base_size = text_size,
+                      base_family = "Futura") {
   theme_minimal(
     base_size = base_size,
     base_family = base_family
   ) %+replace%
     theme(
-      strip.text = element_text(
-        hjust = 0,
-        # face = "italic"
-      ),
-      #                           axis.ticks = element_line(
-      #                             linewidth = 0.125,
-      #                             lineend = "square",
-      #                             color = "black"
-      #                           ),
+      strip.text = element_text(hjust = 0, face = "italic"),
       axis.ticks = element_blank(),
       axis.text.x = element_text(
-        size = 8,
         colour = "black",
-        margin = margin(1, 1, 1, 1)
+        margin = margin(1, 1, 1, 1),
+        size = text_size
       ),
       axis.text.y = element_text(
         colour = "black",
-        size = 8,
         angle = 0,
         vjust = 0.5,
         hjust = 1,
-        margin = margin(1, 1, 1, 1)
+        margin = margin(1, 1, 1, 1),
+        size = text_size
       ),
-      axis.title = element_text(
-        colour = "black",
-        size = 8
-      ),
+      # axis.title = element_blank(),
+      plot.title = element_text(size = text_size, hjust = 0),
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
-      panel.border = element_rect(fill = NA, color = "black", linewidth = 0.25),
       panel.spacing = unit(1.5, "mm"),
-      legend.position = "none",
-      legend.text = element_text(size = 8),
+      legend.position = "bottom",
+      legend.text = element_text(size = rel(0.8)),
       legend.key.height = unit(4, "mm"),
-      plot.title = element_text(
-        size = 8,
-        hjust = 0
-      ),
       complete = TRUE
     )
 }
@@ -150,49 +163,113 @@ unique_genes <- unique(targets)
 
 print(paste(nrow(lib), "sgRNAs targeting", length(unique_genes), "unique genes encoding for receptors, kinases, phosphatases or receptor ligands."))
 
-hits <- paste0(unique_genes, ".1")
+hits <- tibble("gene" = unique_genes)
 
-result_BM <- biomart(
-  genes = hits, # query genes
-  mart = "plants_mart", # subject biomart
-  dataset = "athaliana_eg_gene", # subject dataset
-  attributes = c(
-    "description", "external_synonym", "namespace_1003", "name_1006", "interpro_description"
-  ), # subject attributes
-  filters = "ensembl_transcript_id" # ID type of the query
-)
+data_path <- "/data/PUP-IT/network/"
+
+obo <- get_ontology(paste0(data_path, "databases/go.obo"), extract_tags = "everything")
+
+annotated_terms <- obo$name |> 
+  as_tibble(rownames = "GO_ID") |> 
+  dplyr::rename("name" = "value")
+namespace_terms <- obo$namespace |> 
+  unlist() |> 
+  as_tibble(rownames = "GO_ID") |> 
+  dplyr::rename("namespace" = "value")
+
+annotation <- full_join(annotated_terms, namespace_terms)
+
+gff <- ape::read.gff(paste0(data_path, "databases/Araport11_GFF3_genes_transposons.current.gff")) |> 
+  mutate(gene = str_extract(attributes, "ID=([:alnum:]+)", group = 1)) |> 
+  filter(gene != "ath") |> # remove miRNAs
+  mutate("Description" = str_extract(attributes, "description=([^;]+)", group = 1)) |> 
+  select(gene, Description) |> 
+  group_by(gene) |> 
+  arrange(Description) |> 
+  slice_head(n = 1)
+
+terms <- read_tsv(
+  paste0(data_path, "databases/tair.gaf"),
+  comment = "!",
+  col_names = c(
+    "DB",
+    "DB_ID",
+    "DB_Symbol",
+    "Relation",
+    "GO_ID",
+    "DB_References",
+    "Evidence",
+    "With",
+    "Aspect",
+    "Name",
+    "Synonym",
+    "Type",
+    "Taxon",
+    "Date",
+    "By",
+    "Extension",
+    "Form_ID"
+  )
+  ) |> 
+  select(DB_ID, GO_ID, Synonym)
+
+# mapped_hits <- hits |> 
+#   left_join(mapping) |> 
+#   mutate(gene = str_remove(gene, "/.+")) |> 
+#   arrange(gene) |> 
+#   group_by(protein) |> 
+#   slice_head(n = 1)
+
+MF <- annotation |> 
+  filter(namespace == "molecular_function") |> 
+  select(GO_ID, "GO molecular function" = name)
+
+BP <- annotation |> 
+  filter(namespace == "biological_process") |> 
+  select(GO_ID, "GO biological process" = name)
+
+CC <- annotation |> 
+  filter(namespace == "cellular_component") |> 
+  select(GO_ID, "GO cellular component" = name)
 
 # Collapse data frame to one row per blast hit
-results_list <- result_BM |>
-  group_by(ensembl_transcript_id, external_synonym, description, interpro_description) |>
-  filter(namespace_1003 != "") |>
-  pivot_wider(
-    names_from = namespace_1003,
-    values_from = name_1006,
-    values_fn = ~ paste(sort(unique(.x)), collapse = "; ")
-  ) |>
-  group_by(ensembl_transcript_id) |>
-  summarise(
-    `synonyms` = paste(unique(external_synonym), collapse = "; "),
-    `GO cellular component` = paste(unique(cellular_component), collapse = "; "),
-    `GO biological process` = paste(unique(biological_process), collapse = "; "),
-    `GO molecular function` = paste(unique(molecular_function), collapse = "; "),
-    `description` = unique(description),
-    `interpro terms` = paste(
-      unique(interpro_description),
-      collapse = "; "
-    )
-  )
 
-PKR_groups <- results_list |> 
+complete <- hits |> 
+  left_join(gff) |> 
+  left_join(terms, join_by("gene" == "DB_ID")) |> 
+  left_join(MF) |> 
+  left_join(BP) |> 
+  left_join(CC) |> 
+  group_by(gene) |> 
+  mutate(across(where(is.character), ~ str_replace_na(., ""))) |> 
   summarise(
-    "kinase" = sum(str_detect(`interpro terms`, "kinase")),
-    "phosphatase" = sum(str_detect(`interpro terms`, "phosphatase")),
-    "*TPase" = sum(str_detect(`interpro terms`, "TPase")),
-    "Gnk2" = sum(str_detect(`interpro terms`, "Gnk2")),
-    "CW" = sum(str_detect(`GO cellular component`, "cell wall|extracellular|apoplast|surface")),
-    "PM" = sum(str_detect(`GO cellular component`, "plasma membrane"))
+    gene = paste(unique(gene), collapse = "; "),
+    Synonyms = paste(unique(Synonym), collapse = "|"),
+    "GO terms" = paste(unique(GO_ID), collapse = "; "),
+    `GO cellular component` = paste(unique(`GO cellular component`), collapse = "; "),
+    `GO biological process` = paste(unique(`GO biological process`), collapse = "; "),
+    `GO molecular function` = paste(unique(`GO molecular function`), collapse = "; "),
+    Description = paste(unique(Description), collapse = "; ")
+  ) |> 
+  mutate(
+    across(where(is.character), ~ str_remove_all(., "^; |; $")),
+    across(where(is.character), ~ str_replace_all(., "; ; ", "; ")),
+    across(where(is.character), ~ str_replace_all(., "^$", NA_character_)),
+    Synonyms = str_split(Synonyms, fixed("|")),
+    Synonyms = map(Synonyms, str_unique),
+    Synonyms = map_chr(Synonyms, ~paste(., collapse = "; "))
     )
+
+PKR_groups <- complete |> 
+  summarise(
+    "Total" = n(),
+    "Kinase" = sum(str_detect(`GO molecular function`, "kinase") | str_detect(Description, "kinase"), na.rm = TRUE),
+    "Phosphatase" = sum(str_detect(`GO molecular function`, "phosphatase") | str_detect(Description, "phosphatase"), na.rm = TRUE),
+    "CW" = sum(str_detect(`GO cellular component`, "cell wall|extracellular|apoplast|surface"), na.rm = TRUE),
+    "PM" = sum(str_detect(`GO cellular component`, "plasma membrane"), na.rm = TRUE)
+    )
+
+kable(PKR_groups)
 ```
 
 ## Simulation
@@ -328,7 +405,7 @@ sim_plot <- ggplot(unique_transformants, aes(x = transformant, y = unique_sgRNAs
         ),
         hjust = 1,
         vjust = 0,
-        family = "Helvetica",
+        family = "Futura",
         size = ggtext_size,
         label.size = NA,
         fill = NA,
@@ -345,7 +422,7 @@ sim_plot <- ggplot(unique_transformants, aes(x = transformant, y = unique_sgRNAs
         hjust = 1,
         vjust = 1,
         angle = 90,
-        family = "Helvetica",
+        family = "Futura",
         size = ggtext_size,
         label.size = NA,
         fill = NA,
@@ -358,10 +435,10 @@ sim_plot <- ggplot(unique_transformants, aes(x = transformant, y = unique_sgRNAs
     scale_colour_manual(values = c("black", "white", "black"), guide = 'none') +
     scale_x_continuous(expand = expansion(add = 0)) +
     scale_y_continuous(expand = expansion(add = c(0, 200))) +
-    coord_cartesian(xlim = c(0,19000)) +
+    coord_cartesian(xlim = c(0,19000), clip = "off") +
     theme_leo()
 
-pdf(paste0(out_path, "PKR_sim.pdf"), width = twocol, height = onecol)
+pdf(paste0(out_path, "PKR_sim.pdf"), width = onecol * 1.6, height = onecol*0.7)
 sim_plot
 dev.off()
 ```
@@ -434,11 +511,11 @@ hyp_length <- ggplot(
   theme_leo() +
   theme(legend.position = "none")
 
-pdf(paste0(out_path, "2023-04-24_hypocotyls.pdf"), width = onecol, height = onecol * 0.5)
+# pdf(paste0(out_path, "2023-04-24_hypocotyls.pdf"), width = onecol, height = onecol * 0.5)
 hyp_length
-dev.off()
+# dev.off()
 
-print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
+# print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```
 
 ## 2023-07 hypocotyls
@@ -541,11 +618,11 @@ hyp_length <- ggplot(
   theme(legend.position = "none") +
   coord_flip()
 
-pdf(paste0(out_path, "2023-07-10_hypocotyls.pdf"), height = twocol, width = onecol)
-hyp_length
-dev.off()
-
-print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
+# pdf(paste0(out_path, "2023-07-10_hypocotyls.pdf"), height = twocol, width = onecol)
+# hyp_length
+# dev.off()
+# 
+# print(hyp_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```
 
 
@@ -649,11 +726,11 @@ root_length <- ggplot(
   theme(legend.position = "none") +
   coord_flip()
 
-pdf(paste0(out_path, "2023-07-10_roots.pdf"), height = twocol, width = onecol)
-root_length
-dev.off()
+# pdf(paste0(out_path, "2023-07-10_roots.pdf"), height = twocol, width = onecol)
+# root_length
+# dev.off()
 
-print(root_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
+# print(root_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 ```
 
 ## Proposal figure
@@ -661,7 +738,7 @@ print(root_length, vp = grid::viewport(gp = grid::gpar(cex = 2)))
 
 ```{r}
 
-highlights <- c("153", "74-1", "454", "197", "82", "720", "Col-0")
+highlights <- c("19", "153", "197", "454", "72", "666", "699", "720", "Col-0")
 
 hyp_shadow <- hyp_data |> 
   group_by(line) |> 
@@ -697,9 +774,11 @@ root_length_hl <- root_length +
   scale_x_discrete(breaks = highlights) +
   theme(axis.title.y = element_blank())
 
-pdf(paste0(out_path, "NNF_figure_1.pdf"), height = twocol, width = onecol)
-hyp_length_hl + root_length_hl
+pdf(paste0(out_path, "UPSC_fig.pdf"), height = twocol*0.7, width = onecol*0.7)
+root_length_hl
 dev.off()
+
+hyp_length + root_length
 ```
 
 ## Proposal Ganntt
@@ -749,11 +828,12 @@ NNF_gantt <- ggplot(NNF_long, aes(x = forcats::fct_rev(forcats::fct_inorder(Task
         legend.title = element_blank(),
         strip.text = element_text(face = "bold")) +
   ggforce::facet_col(~Aim, scales = "free_y", space = "free")
+
 NNF_gantt
 
-pdf(paste0(out_path, "NNF_gantt_blaschek.pdf"), width = twocol, height = onecol)
-NNF_gantt
-dev.off()
+# pdf(paste0(out_path, "NNF_gantt_blaschek.pdf"), width = twocol, height = onecol)
+# NNF_gantt
+# dev.off()
 ```
 
 
@@ -775,7 +855,7 @@ lines <- full_join(sig_root, sig_hyp) |>
   full_join(stem) |>
   separate(line, into = c("line", "T2 line"), sep = "-")
 
-sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR_line_table.tsv") |>
+sgRNAs <- read_tsv("/home/leonard/Documents/Latex/2022_labbook/PKR_line_table.tsv") |>
   drop_na(Targets) |>
   mutate(Line = as.character(Line)) |>
   mutate(targets = str_extract_all(Targets, "[:alnum:]+")) |>
@@ -784,66 +864,61 @@ sgRNAs <- read_tsv("/home/leonard/Documents/LaTex/latex_scripts/2022_labbook/PKR
 
 write_tsv(sgRNAs, paste0(out_path, "phenotype_targets.tsv"))
 
-sgRNAs <- sgRNAs |>
-  mutate(targets = paste0(targets, ".1"))
-hits <- pull(sgRNAs, targets)
+hits <- sgRNAs |> 
+  select("gene" = targets)
 
-result_BM <- biomart(
-  genes = hits, # query genes
-  mart = "plants_mart", # subject biomart
-  dataset = "athaliana_eg_gene", # subject dataset
-  attributes = c(
-    "description", "external_synonym", "namespace_1003", "name_1006", "interpro_description"
-  ), # subject attributes
-  filters = "ensembl_transcript_id" # ID type of the query
-)
-
-# Collapse data frame to one row per blast hit
-results_list <- result_BM |>
-  group_by(ensembl_transcript_id, external_synonym, description, interpro_description) |>
-  filter(namespace_1003 != "") |>
-  pivot_wider(
-    names_from = namespace_1003,
-    values_from = name_1006,
-    values_fn = ~ paste(sort(unique(.x)), collapse = "; ")
-  ) |>
-  group_by(ensembl_transcript_id) |>
+complete <- hits |> 
+  left_join(gff) |> 
+  left_join(terms, join_by("gene" == "DB_ID")) |> 
+  left_join(MF) |> 
+  left_join(BP) |> 
+  left_join(CC) |> 
+  group_by(gene) |> 
+  mutate(across(where(is.character), ~ str_replace_na(., ""))) |> 
   summarise(
-    `A. thaliana synonyms` = paste(unique(external_synonym), collapse = "; "),
-    `A. thaliana GO cellular component` = paste(unique(cellular_component), collapse = "; "),
-    `A. thaliana GO biological process` = paste(unique(biological_process), collapse = "; "),
-    `A. thaliana GO molecular function` = paste(unique(molecular_function), collapse = "; "),
-    `A. thaliana description` = unique(description),
-    `A. thaliana interpro terms` = paste(
-      unique(interpro_description),
-      collapse = "; "
+    gene = paste(unique(gene), collapse = "; "),
+    Synonyms = paste(unique(Synonym), collapse = "|"),
+    "GO terms" = paste(unique(GO_ID), collapse = "; "),
+    `GO cellular component` = paste(unique(`GO cellular component`), collapse = "; "),
+    `GO biological process` = paste(unique(`GO biological process`), collapse = "; "),
+    `GO molecular function` = paste(unique(`GO molecular function`), collapse = "; "),
+    Description = paste(unique(Description), collapse = "; ")
+  ) |> 
+  mutate(
+    across(where(is.character), ~ str_remove_all(., "^; |; $")),
+    across(where(is.character), ~ str_replace_all(., "; ; ", "; ")),
+    across(where(is.character), ~ str_replace_all(., "^$", NA_character_)),
+    Synonyms = str_split(Synonyms, fixed("|")),
+    Synonyms = map(Synonyms, str_unique),
+    Synonyms = map_chr(Synonyms, ~paste(., collapse = "; "))
     )
-  )
 
-annotated_lines <- full_join(sgRNAs, results_list, by = c("targets" = "ensembl_transcript_id")) |>
+annotated_lines <- full_join(sgRNAs, complete, by = c("targets" = "gene")) |>
   full_join(lines)
+
+write_tsv(annotated_lines, paste0(out_path, "phenotype_table.tsv"))
 # filter(!(is.na(sig_root) & is.na(sig_hyp) & is.na(sterile))) |>
 # filter(str_detect(`A. thaliana GO cellular component`, "membrane|apoplast|extracellular"))
 
 table <- annotated_lines |>
   mutate(
     PM = case_when(
-      str_detect(`A. thaliana GO cellular component`, "plasma membrane") ~ "🗸",
+      str_detect(`GO cellular component`, "plasma membrane") ~ "🗸",
       TRUE ~ NA
     ),
     Wall = case_when(
-      str_detect(`A. thaliana GO cellular component`, "apoplast|extracellular") ~ "🗸",
+      str_detect(`GO cellular component`, "apoplast|extracellular") ~ "🗸",
       TRUE ~ NA
     )
   ) |>
   mutate(line = ordered(as.factor(line), levels = str_sort(levels(as.factor(line)), numeric = TRUE))) |>
-  group_by(line) |>
-  summarise(across(everything(), ~ paste(unique(.x[!is.na(.x)]), collapse = "; "))) |>
+  # group_by(line) |>
+  # summarise(across(everything(), ~ paste(unique(.x[!is.na(.x)]), collapse = "; "))) |>
   select(
     line,
     targets,
     `Published phenotype`,
-    `A. thaliana description`,
+    Description,
     "Root" = sig_root,
     "Hyp." = sig_hyp,
     Stem,
@@ -862,7 +937,7 @@ table <- annotated_lines |>
 
 
 kable(
-  table |> select(-c(11:16)),
+  table |> select(-c(11:16)) |> drop_na(targets),
   "html",
   caption = "Summary of identified CRISPR targets.",
   escape = F,
@@ -874,8 +949,9 @@ kable(
   column_spec(8, background = table$sterile_col) |>
   column_spec(9, background = table$pm_col) |>
   column_spec(10, background = table$wall_col) |>
-  column_spec(1:10, border_left = "1px solid white") |>
-  row_spec(1:nrow(table), extra_css = "border-bottom: 1px solid white")
+  column_spec(2:4, border_left = "10px solid white") |>
+  column_spec(5:10, border_left = "2px solid white") |>
+  row_spec(1:nrow(table |> drop_na(targets)), extra_css = "border-bottom: 2px solid white")
 ```
 
 ## 2024 table
@@ -884,16 +960,20 @@ kable(
 
 ```{r}
 total <- table |> 
+  distinct(line, .keep_all = TRUE) |> 
+  replace_na(list(Ster. = "", Stem = "", Hyp. = "", Root = "")) |> 
   summarise(
     `Abberant phenotype (T1)` = n(),
     Sterile = sum(Ster. != ""),
     Stem = sum(Stem != ""),
     Hypocotyl = sum(Hyp. != ""),
-    Root= sum(Root != ""),
+    Root = sum(Root != ""),
   ) |> 
   mutate(group = "Total", .before = 1)
 
 seq <- table |> 
+  distinct(line, .keep_all = TRUE) |> 
+  replace_na(list(Ster. = "", Stem = "", Hyp. = "", Root = "")) |> 
   filter(targets != "") |> 
   summarise(
     `Abberant phenotype (T1)` = n(),
@@ -905,6 +985,8 @@ seq <- table |>
   mutate(group = "Sequenced", .before = 1)
 
 new <- table |> 
+  distinct(line, .keep_all = TRUE) |> 
+  replace_na(list(Ster. = "", Stem = "", Hyp. = "", Root = "")) |> 
   filter(`Published phenotype` == "none") |> 
   summarise(
     `Abberant phenotype (T1)` = n(),
@@ -916,6 +998,8 @@ new <- table |>
   mutate(group = "Completely unknown function", .before = 1)
 
 published <- table |> 
+  distinct(line, .keep_all = TRUE) |> 
+  replace_na(list(Ster. = "", Stem = "", Hyp. = "", Root = "")) |> 
   filter(`Published phenotype` != "none" & `Published phenotype` != "") |> 
   summarise(
     `Abberant phenotype (T1)` = n(),
@@ -939,8 +1023,8 @@ sum_gt <- sum_tab |>
   tab_stub_indent(3:4, indent = 4) |> 
   tab_caption("Table 1: Preliminary screening yielded 747 transformants, of which 62 lines had severe T1 phenotypes.")
 
-sum_gt |> 
-  gtsave("table1.html")
+sum_gt 
+  # gtsave("table1.html")
 ```
 
 
