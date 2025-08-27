@@ -282,7 +282,7 @@ map <- ggplot() +
       y = lat,
       label = name
     ),
-    face = 2,
+    # face = 2,
     nudge_x = -1,
     hjust = 1,
     family = "Futura",
@@ -298,27 +298,27 @@ map <- ggplot() +
     colour = "#e8c245",
     size = 1.5,
     lineend = "butt",
-    curvature = -0.4,
+    curvature = -0.7,
     x = 12.568333,
-    y = 55.676111, 
+    y = 55.676111,
     xend = 20,
-    yend = 63,
+    yend = 63.828,
     arrow = arrow(
       type = "closed",
       length = unit(1.5, "mm")
     )
   ) +
   geom_label(
-    data = POIs[6, ],
+    data = POIs[7, ],
     aes(
       x = lon,
       y = lat,
       label = name
     ),
-    nudge_x = -1,
-    hjust = 1,
+    nudge_x = 1,
+    hjust = 0,
     family = "Futura",
-    # fontface = 2,
+    fontface = 2,
     size = ggtext_size,
     label.size = NA,
     label.r = (unit(0, "mm")),
@@ -353,7 +353,7 @@ map <- ggplot() +
     axis.title = element_blank()
     # plot.background = element_rect(fill = "#fff9f5ff", colour = NA)
   ) +
-  transition_layers(layer_order = c(1, 2, 3:13)) +
+  transition_layers(layer_order = c(1, 2, 3:15)) +
   enter_grow()
 
 # pdf("europe.pdf", height = 5)
